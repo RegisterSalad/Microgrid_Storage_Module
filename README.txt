@@ -9,7 +9,7 @@
      _get_grid
      _create_microgrid
 
-     in the MicrogridGenerator.py file    } 5/23/2022
+     in the MicrogridGenerator.py file    } 5/19/2022
 
 
 {    Base algo Script is up, I stated on the microgrid class   }  5/26/2022
