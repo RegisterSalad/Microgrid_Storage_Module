@@ -4,14 +4,41 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-TIMESTEPS = 8760
+TIMESTEPS = 86400 # Number of seconds in a day of operation
 
 #Print all final values from the grid into an excel spreadsheet 
-class grid_design():
+
+# Genrator set class
+class genset():
+    ''' Contains all parameters of grid generator set.
+        Gensets cost fuel to operate and cut into grid margins '''
+    def __init__(self, df_genset):
+        self.genset_min = df_genset['genset_min']
+        self.genset_max = df_genset['genset_max']
+    
+    def gen_cost(self
+    
+# Energy storage class
+class storage():
+    ''' Contains the parameters for the battery types
+        Battery types are:
+        - Lithium Ion Batteries
+        - Vanadium Flow Batteries
+        - Flywheel Storage '''
+    def __init_(self, df_storage)
+        # Storage max capacities
+        self.Li_cap = df_storage['Li_size'] # In kWh
+        self.Li_power = df_storage['Li_power'] # In kilo-Watts
+        self.vanadiumflow_cap = df_storage['vanadiumflow_cap']
+        self.flywheel_cap = df_storage['flywheeel_cap']
+        
+
+# Grid design class
+class grid_design():   
     ''' This class contains all the elements of the designed grids
         The grid will be desinged with 1 scenario in mind each. Grids cannot be modified during the scenario.
         The score that each grid gets will be a part of how the network finds patterns and adjust new designs
-        Score will be determined by traking the price of the grid and how it long it can remain opperational  '''
+        Score will be determined by traking the price of the grid and how it long it can remain opperational '''
     def __init__(self, df_requirements): #requiremtns is pandas dataframe
         # Parse requirements dictionary into single values to opperate on
 
@@ -24,15 +51,15 @@ class grid_design():
 
         # Highest ammount that the all grid components can cost (installation not included) in $ (component cost is varible)
         self.component_cost_max = df_requirements['component_cost_max']
-
+        
         # Local Power cost in $
         self.local_power_cost = df_requirements['local_power_cost']
         # Uptime of the microgrid if main grid goes down
         self.reliablity_min = df_requirements['requirements']
 
-    def get_mg_export(self, df_pv, df_genset, df_flywheel, df_vanadiumflow): 
+    def get_mg_exports(self, df_pv, df_genset, df_flywheel, df_vanadiumflow): 
         # Function returns dataframe the total ammount of kWh that the grid can export every timestep
-        df_total_self_gen = pd.DataFrame(df_pv[i] + df_genset[i] + df_flywheel + df_vanadiumflow for i in range (0, TIMESTEPS) )
+        df_total_self_gen = pd.DataFrame(df_pv[i] + df_genset[i] + df_flywheel[i] + df_vanadiumflow[i] for i in range (0, TIMESTEPS) )
         return df_total_self_gen
 
     def get_cost_per_kwh(self, local_power_cost):  
