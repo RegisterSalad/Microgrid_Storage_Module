@@ -66,7 +66,8 @@ class grid_design():
         # Local Power cost in $
         self.local_power_cost = df_requirements['local_power_cost']
         # Uptime of the microgrid if main grid goes down
-        self.reliablity_min = df_requirements['requirements']
+        self.reliablity = df_requirements['reliability'] # Whether or not the grid is in a disaster scenario
+	
 
     def get_mg_exports(self, df_pv, df_genset, df_flywheel, df_vanadiumflow): 
         ''' Function returns dataframe the total ammount of kWh that the grid can export every timestep '''
