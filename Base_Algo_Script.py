@@ -23,15 +23,18 @@ class storage():
     ''' Contains the parameters for the battery types
         Battery types are:
         - Lithium Ion Batteries
-        - Vanadium Flow Batteries
+        - Vanadium Ion Flow Batteries
         - Flywheel Storage '''
     def __init_(self, df_storage)
-        # Storage max capacities
-        self.Li_cap = df_storage['Li_size'] # In kWh
-        self.Li_power = df_storage['Li_power'] # In kilowatts
+        # Maximums for capacities and power
+        # Lithium Ion
+        self.li_cap = df_storage['li_size'] # In kWh
+        self.li_power = df_storage['li_power'] # In kilowatts
+        # Vanadium Ion Flow 
         self.vanadiumflow_cap = df_storage['vanadiumflow_cap'] # In kWh
         self.vanadiumflow_power = df_storage['vanadiumflow_power'] # In kilowatts
-        self.flywheel_cap = df_storage['flywheeel_cap'] # In kWh
+        # Flywheel
+        self.flywheel_cap = df_storage['flywheel_cap'] # In kWh
         self.flywheel_power = df_storage['flywheeel_power'] # In kilowatts
         
         
