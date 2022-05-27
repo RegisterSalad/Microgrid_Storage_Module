@@ -28,9 +28,12 @@ class storage():
     def __init_(self, df_storage)
         # Storage max capacities
         self.Li_cap = df_storage['Li_size'] # In kWh
-        self.Li_power = df_storage['Li_power'] # In kilo-Watts
-        self.vanadiumflow_cap = df_storage['vanadiumflow_cap']
-        self.flywheel_cap = df_storage['flywheeel_cap']
+        self.Li_power = df_storage['Li_power'] # In kilowatts
+        self.vanadiumflow_cap = df_storage['vanadiumflow_cap'] # In kWh
+        self.vanadiumflow_power = df_storage['vanadiumflow_power'] # In kilowatts
+        self.flywheel_cap = df_storage['flywheeel_cap'] # In kWh
+        self.flywheel_power = df_storage['flywheeel_power'] # In kilowatts
+        
         
 
 # Grid design class
