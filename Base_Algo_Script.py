@@ -39,7 +39,9 @@ class storage():
         self.flywheel_cap = df_storage['flywheel_cap'] # In kWh
         self.flywheel_max_power = df_storage['flywheeel_max_power'] # In kilowatts
     def get_lithium_performance(self, self.li_cap, self.li_max_power):
-		''' Uses the performance profile of bulk storage lithium Ion cells to determine the power capabilities evey time step '''
+	''' Uses the performance profile of bulk storage lithium Ion cells to return the power capabilities evey time step '''
+	# li_pow = self.li_max_power - (self
+
                  
         
 # Grid design class
