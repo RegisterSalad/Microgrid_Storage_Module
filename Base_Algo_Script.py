@@ -15,6 +15,8 @@ class genset():
     def __init__(self, df_genset):
         self.genset_min = df_genset['genset_min']
         self.genset_max = df_genset['genset_max']
+        self.ramping_rate = df_genset['ramping_rate']
+        
     
     def gen_cost(self
     
@@ -26,19 +28,20 @@ class storage():
         - Vanadium Ion Flow Batteries
         - Flywheel Storage '''
     def __init_(self, df_storage)
-        # Maximums for capacities and power
+        ''' Maximums for capacities and power '''
         # Lithium Ion
         self.li_cap = df_storage['li_size'] # In kWh
-        self.li_power = df_storage['li_power'] # In kilowatts
+        self.li_max_power = df_storage['li_max_power'] # In kilowatts
         # Vanadium Ion Flow 
         self.vanadiumflow_cap = df_storage['vanadiumflow_cap'] # In kWh
-        self.vanadiumflow_power = df_storage['vanadiumflow_power'] # In kilowatts
+        self.vanadiumflow_max_power = df_storage['vanadiumflow_max_power'] # In kilowatts
         # Flywheel
         self.flywheel_cap = df_storage['flywheel_cap'] # In kWh
-        self.flywheel_power = df_storage['flywheeel_power'] # In kilowatts
+        self.flywheel_max_power = df_storage['flywheeel_max_power'] # In kilowatts
+    def get_lithium_performance(self, self.li_cap, self.li_max_power):
+		''' Uses the performance profile of bulk storage lithium Ion cells to determine the power capabilities evey time step '''
+                 
         
-        
-
 # Grid design class
 class grid_design():   
     ''' This class contains all the elements of the designed grids
@@ -46,7 +49,7 @@ class grid_design():
         The score that each grid gets will be a part of how the network finds patterns and adjust new designs
         Score will be determined by traking the price of the grid and how it long it can remain opperational '''
     def __init__(self, df_requirements): #requiremtns is pandas dataframe
-        # Parse requirements dictionary into single values to opperate on
+        ''' Parse requirements dictionary into single values to opperate on '''
 
         # Load minimum in kWh
         self.load_min =  df_requirements['load_min']
@@ -64,12 +67,12 @@ class grid_design():
         self.reliablity_min = df_requirements['requirements']
 
     def get_mg_exports(self, df_pv, df_genset, df_flywheel, df_vanadiumflow): 
-        # Function returns dataframe the total ammount of kWh that the grid can export every timestep
+        ''' Function returns dataframe the total ammount of kWh that the grid can export every timestep '''
         df_total_self_gen = pd.DataFrame(df_pv[i] + df_genset[i] + df_flywheel[i] + df_vanadiumflow[i] for i in range (0, TIMESTEPS) )
         return df_total_self_gen
 
     def get_cost_per_kwh(self, local_power_cost):  
-        # Retuns dataframe will power cost per kWh when connected to this micro-grid
+        ''' Retuns dataframe will power cost per kWh when connected to this micro-grid '''
         df_cost_with_offset = 0 #placeholder
         return df_cost_with_offset
     
