@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 TIMESTEPS = 86400 # Number of seconds in a day of operation
 
 #Print all final values from the grid into an excel spreadsheet 
-
+# Disaster grid profile must be implimented
 # Genrator set class
 class genset():
     ''' Contains all parameters of grid generator set.
