@@ -18,8 +18,6 @@ class genset():
         self.ramping_rate = df_genset['ramping_rate']
         
     
-    def gen_cost(self
-    
 # Energy storage class
 class storage():
     ''' Contains the parameters for the battery types
@@ -27,7 +25,7 @@ class storage():
         - Lithium Ion Batteries
         - Vanadium Ion Flow Batteries
         - Flywheel Storage '''
-    def __init_(self, df_storage)
+    def __init_(self, df_storage):
         ''' Maximums for capacities and power '''
         # Lithium Ion
         self.li_cap = df_storage['li_size'] # In kWh
@@ -38,8 +36,8 @@ class storage():
         # Flywheel
         self.flywheel_cap = df_storage['flywheel_cap'] # In kWh
         self.flywheel_max_power = df_storage['flywheeel_max_power'] # In kilowatts
-    def get_lithium_performance(self, self.li_cap, self.li_max_power):
-	''' Uses the performance profile of bulk storage lithium Ion cells to return the power capabilities evey time step '''
+    def get_lithium_performance(self, li_cap, li_max_power):
+        ''' Uses the performance profile of bulk storage lithium Ion cells to return the power capabilities evey time step '''
 	# li_pow = self.li_max_power - (self
 
                  
@@ -78,5 +76,7 @@ class grid_design():
         ''' Retuns dataframe will power cost per kWh when connected to this micro-grid '''
         df_cost_with_offset = 0 #placeholder
         return df_cost_with_offset
+    
+
     
     
