@@ -9,7 +9,7 @@ TIMESTEPS = 86400 # Number of seconds in a day of operation
 #Print all final values from the grid into an excel spreadsheet 
 # Disaster grid profile must be implimented
 # Genrator set class
-class genset():
+class genset:
     ''' Contains all parameters of grid generator set.
         Gensets cost fuel to operate and cut into grid margins '''
     def __init__(self, df_genset):
@@ -19,7 +19,7 @@ class genset():
         
     
 # Energy storage class
-class storage():
+class storage:
     ''' Contains the parameters for the battery types
         Battery types are:
         - Lithium Ion Batteries
@@ -43,7 +43,7 @@ class storage():
                  
         
 # Grid design class
-class grid_design():   
+class grid_design:   
     ''' This class contains all the elements of the designed grids
         The grid will be desinged with 1 scenario in mind each. Grids cannot be modified during the scenario.
         The score that each grid gets will be a part of how the network finds patterns and adjust new designs
@@ -76,7 +76,3 @@ class grid_design():
         ''' Retuns dataframe will power cost per kWh when connected to this micro-grid '''
         df_cost_with_offset = 0 #placeholder
         return df_cost_with_offset
-    
-
-    
-    
