@@ -57,6 +57,8 @@ def create_base_grid(grid_type = 'perfect'):
         df_grid['requirements']['local_power_cost'] = 0.11 # $USD per kWh
         # Uptime of the microgrid if main grid goes down
         df_grid['requirements']['reliability'] = grid_type # Whether or not the grid is in a disaster scenario
+	#Outages
+	
         
         return df_grid
     else:
