@@ -117,7 +117,7 @@ class GridDesign:
         The grid will be desinged with 1 scenario in mind each. Grids cannot be modified during the scenario.
         The score that each grid gets will be a part of how the network finds patterns and adjust new designs
         Score will be determined by traking the price of the grid and how it long it can remain opperational '''
-    def __init__(self, df_grid): #requiremtns is pandas dataframe
+    def __init__(self, df_grid): #requirements is pandas dataframe
         ''' Parse requirements dictionary into single values to opperate on '''
         # Load minimum in kW
         self.load_min =  df_grid['requirements']['load_min']
