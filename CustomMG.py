@@ -40,7 +40,7 @@ def create_base_grid(grid_type = 'perfect'):
         # Flywheel
         df_grid['storage']['flywheel_cap'] = 64 # Capacity In kWh
         df_grid['storage']['flywheeel_max_power'] = 8 #Max power output in kilowatts
-        df_grid['storage']['flywheel_cost_per_kWh'] = 3.125 # in USD $
+        df_grid['storage']['flywheel_cost_per_kWh'] = 330 # in USD $
 
         #Grid Restrictions
         #Load minimum in kW
