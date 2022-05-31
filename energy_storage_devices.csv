@@ -1,5 +1,5 @@
-﻿type,max_charge,min_charge,max_discharge,min_discharge,eff_charge,eff_discharge,self_discharge,capital_cost,marginal_cost,ramp_speed,resp_time
-li-ion,,,,,,,,,,,
-flywheel,,,,,,,,,,,
-v2g,,,,,,,,,,,
-flow,,,,,,,,,,,
+﻿type,max_charge,min_charge,max_discharge,min_discharge,eff_charge,eff_discharge,self_discharge,capital_cost,marginal_cost,ramp_speed,resp_time,usable_start,usable_end
+li-ion,,,,,,,,,,,,,
+flywheel,,,,,,,,,,,,,
+v2g,,,,,,,,,,,,,
+flow,,,,,,,,,,,,,
