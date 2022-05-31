@@ -27,7 +27,7 @@ def create_base_grid(grid_type = 'perfect'):
         df_grid['genset']['genset_min'] = 1000 # Minimum required generator set size in kWh
         df_grid['genset']['genset_max'] = 1500 # Maximum allowed generator set size in kWh
         df_grid['genset']['ramping_rate'] = 12 # Power per second in kW/s
-        df_grid['genset']['capacity cost'] = 1400 # Cost of installation for average internal combustion generator sets in USD $ 
+        df_grid['genset']['capacity cost'] = 335 # Cost of installation for average internal combustion generator sets in USD $ 
 
         # Storage of Test Grid
         df_grid['storage']['li_capacity'] = 1 # Capacity In kWh
