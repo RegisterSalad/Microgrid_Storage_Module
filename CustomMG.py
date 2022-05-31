@@ -31,15 +31,18 @@ def create_base_grid(grid_type = 'perfect'):
 
         # Storage of Test Grid
         df_grid['storage']['li_capacity'] = 1 # Capacity In kWh
-        df_grid['storage']['li_max_power'] = 1 # Max power output kilowatts
+        df_grid['storage']['li_max_discharge'] = 1 # Max power output kilowatts
+        df_grid['storage']['li_max_charge'] = 1 # Max power input kilowatts
         df_grid['storage']['li_cost_per_kWh'] = 135 # in USD $
         #  Ion Flow 
         df_grid['storage']['flow_cap'] = 40 # Capacity In kWh
-        df_grid['storage']['flow_max_power'] = 20 # Max power output in kilowatts
+        df_grid['storage']['flow_max_discharge'] = 20 # Max power output in kilowatts
+        df_grid['storage']['flow_max_charge'] = 20 # Max power input in kilowatts
         df_grid['storage']['flow_cost_per_kWh'] = 54 # in USD $
         # Flywheel
         df_grid['storage']['flywheel_cap'] = 64 # Capacity In kWh
-        df_grid['storage']['flywheeel_max_power'] = 8 #Max power output in kilowatts
+        df_grid['storage']['flywheeel_max_discharge'] = 8 #Max power output in kilowatts
+        df_grid['storage']['flywheeel_max_charge'] = 8 #Max power input in kilowatts
         df_grid['storage']['flywheel_cost_per_kWh'] = 330 # in USD $
 
         #Grid Restrictions
@@ -84,7 +87,7 @@ class Storage:
         ''' Maximums for capacities and power '''
         # Lithium Ion
         self.li_cap = df_grid['storage']['li_capacity'] # In kWh
-        self.li_max_power = df_grid['storage']['li_max_power'] # In kilowatts
+        self.li_max_discharge = df_grid['storage']['li_max_power'] # In kilowatts
         self.li_cost_per_kWh = df_grid['storage']['li_cost_per_kWh'] # in USD $
         #  Ion Flow 
         self.flow_cap = df_grid['storage']['flow_cap'] # In kWh
