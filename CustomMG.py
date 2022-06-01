@@ -65,17 +65,7 @@ def create_base_grid(grid_type = 'perfect'):
         return 0
 
     
-#Print all final values from the grid into an excel spreadsheet 
-# Disaster grid profile must be implimented
-# Genrator set class
-class Genset:
-    ''' Contains all parameters of grid generator set.
-        Gensets cost fuel to operate and cut into grid margins '''
-    def __init__(self, df_grid):
-        self.genset_min = df_grid['genset']['genset_min'] # Minimum required generator set size in kWh
-        self.genset_max = df_grid['genset']['genset_max'] # Maximum allowed generator set size in kWh
-        self.ramping_rate = df_grid['genset']['ramping_rate'] # Power per second in kW/s
-        self.cost_per_capacity = df_grid['genset']['capacity cost'] # Cost of installation for average internal combustion generator sets in USD $ 
+
         
     
 # Energy storage class
