@@ -90,17 +90,17 @@ class Storage:
         # Lithium Ion
         self.li_cap = df_grid['storage']['li_capacity'] # In kWh
         self.li_max_discharge = df_grid['storage']['li_max_discharge'] # # Max power output in kilowatts
-	self.li_max_charge = df_grid['storage']['li_max_charge'] # Max power input in kilowatts
+        self.li_max_charge = df_grid['storage']['li_max_charge'] # Max power input in kilowatts
         self.li_cost_per_kWh = df_grid['storage']['li_cost_per_kWh'] # in USD $
         #  Ion Flow 
         self.flow_cap = df_grid['storage']['flow_cap'] # In kWh
         self.flow_max_discharge = df_grid['storage']['flow_max_discharge'] # Max power output in kilowatts
-	self.flow_max_charge = df_grid['storage']['flow_max_charge'] # Max power input in kilowatts
+        self.flow_max_charge = df_grid['storage']['flow_max_charge'] # Max power input in kilowatts
         self.flow_cost_per_kWh = df_grid['storage']['flow_cost_per_kWh'] # in USD $
         # Flywheel
         self.flywheel_cap = df_grid['storage']['flywheel_cap'] # In kWh
         self.flywheel_max_discharge = df_grid['storage']['flywheeel_max_discharge'] # Max power output in kilowatts
-	self.flywheel_max_charge = df_grid['storage']['flywheeel_max_charge'] # Max power input in kilowatts
+        self.flywheel_max_charge = df_grid['storage']['flywheeel_max_charge'] # Max power input in kilowatts
         self.flywheel_cost_per_kWh = df_grid['storage']['flywheel_cost_per_kWh'] # in USD $
 
     def get_lithium_performance(self, li_cap, li_max_power):
