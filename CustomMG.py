@@ -6,8 +6,15 @@ import matplotlib.pyplot as plt
 
 TIMESTEPS = 86400 # Number of seconds in a day of operation
 
-def create_base_grid(grid_type = 'perfect'):
-    df_grid = pd.DataFrame() # Create Empy grid dataframe
+def create_base_grid(grid_type = ''):
+    df_grid = pd.DataFrame({
+    'genset': {'genset_min' : 0, 'genset_max': 0, 'ramping_rate': 0, 'capacity_cost': 0},
+    'storage': {'li_capacity': 0, 'li_max_discharge': 0, 'li_max_charge': 0, 'li_cost_per_kWh': 0,
+                'flow_capacity': 0, 'flow_max_discharge': 0, 'flow_max_charge': 0, 'flow_cost_per_kWh': 0,
+                'flywheel_capacity': 0, 'flywheeel_max_discharge': 0, 'flywheeel_max_charge': 0, 'flywheel_cost_per_kWh': 0},
+
+    'requirements': {'load_min': 0, 'pv_min': 0, 'pv_max': 0, 'component_cost_max': 0, 'local_power_cost': 0, 'reliability': ' '}
+    }) # Create Formated Dataframe
     if grid_type == 'disaster':
         #disater grid logic
         return df_grid
@@ -22,12 +29,11 @@ def create_base_grid(grid_type = 'perfect'):
 
     elif grid_type == 'test': 
         #Enter Preset Values
-
         #Genset of Test Grid
         df_grid['genset']['genset_min'] = 1000 # Minimum required generator set size in kWh
         df_grid['genset']['genset_max'] = 1500 # Maximum allowed generator set size in kWh
         df_grid['genset']['ramping_rate'] = 12 # Power per second in kW/s
-        df_grid['genset']['capacity cost'] = 335 # Cost of installation for average internal combustion generator sets in USD $ 
+        df_grid['genset']['capacity_cost'] = 335 # Cost of installation for average internal combustion generator sets in USD $ 
 
         # Storage of Test Grid
         df_grid['storage']['li_capacity'] = 1 # Capacity In kWh
@@ -35,12 +41,12 @@ def create_base_grid(grid_type = 'perfect'):
         df_grid['storage']['li_max_charge'] = 1 # Max power input kilowatts
         df_grid['storage']['li_cost_per_kWh'] = 135 # in USD $
         #  Ion Flow 
-        df_grid['storage']['flow_cap'] = 40 # Capacity In kWh
+        df_grid['storage']['flow_capacity'] = 40 # Capacity In kWh
         df_grid['storage']['flow_max_discharge'] = 20 # Max power output in kilowatts
         df_grid['storage']['flow_max_charge'] = 20 # Max power input in kilowatts
         df_grid['storage']['flow_cost_per_kWh'] = 54 # in USD $
         # Flywheel
-        df_grid['storage']['flywheel_cap'] = 64 # Capacity In kWh
+        df_grid['storage']['flywheel_capacity'] = 64 # Capacity In kWh
         df_grid['storage']['flywheeel_max_discharge'] = 8 #Max power output in kilowatts
         df_grid['storage']['flywheeel_max_charge'] = 8 #Max power input in kilowatts
         df_grid['storage']['flywheel_cost_per_kWh'] = 330 # in USD $
@@ -57,9 +63,6 @@ def create_base_grid(grid_type = 'perfect'):
         df_grid['requirements']['local_power_cost'] = 0.11 # $USD per kWh
         # Uptime of the microgrid if main grid goes down
         df_grid['requirements']['reliability'] = grid_type # Whether or not the grid is in a disaster scenario
-	#Outages
-	
-        
         return df_grid
     else:
         return 0
