@@ -1,4 +1,4 @@
-﻿type,max_charge,min_charge,max_discharge,min_discharge,eff_charge,eff_discharge,self_discharge,capital_cost,marginal_cost,ramp_speed,resp_time,usable_start,usable_end
+﻿type,max_charge,min_charge,max_discharge,min_discharge,eff_charge,eff_discharge,self_discharge,capital_cost_per_kWh,marginal_cost,ramp_speed,resp_time,usable_start,usable_end
 li-ion,0,1,,,,,,650,,,,,
 flywheel,1,0.14,0.86*0.25,0,x**4/((1.01105*x**2+0.199918*x-0.165293)*(1.00075*x**2+0.279493*x+0.0342874)),x**4/((1.01105*x**2+0.199918*x-0.165293)*(1.00075*x**2+0.279493*x+0.0342874)),7.47775x+8.52548*x**(-1/2)+57.118,330,,,<1s,,
 v2g,,,,,,,,"fixed, 1 unit per house",,,,,
