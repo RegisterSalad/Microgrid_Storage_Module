@@ -9,6 +9,7 @@ TIMESTEPS = 86400 # Number of seconds in a day of operation
 def create_base_grid(grid_type = ''):
     df_grid = pd.DataFrame({
     'genset': {'genset_min' : 0, 'genset_max': 0, 'ramping_rate': 0, 'capacity_cost': 0},
+	    
     'storage': {'li_capacity': 0, 'li_max_discharge': 0, 'li_max_charge': 0, 'li_cost_per_kWh': 0,
                 'flow_capacity': 0, 'flow_max_discharge': 0, 'flow_max_charge': 0, 'flow_cost_per_kWh': 0,
                 'flywheel_capacity': 0, 'flywheeel_max_discharge': 0, 'flywheeel_max_charge': 0, 'flywheel_cost_per_kWh': 0},
