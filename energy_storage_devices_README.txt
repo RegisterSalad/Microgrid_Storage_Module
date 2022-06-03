@@ -2,6 +2,7 @@ type: type of energy storage
 max_charge: maximum charge as a proportion of device capacity, between 0 and 1
 min_charge: minimum charge as a proportion of device capacity, between 0 and 1
 max_discharge: maximum discharge rate per second as a proportion of device capacity, between 0 and 1 or UNDEF
+max_peak_discharge: maximum discharge rate per second for ten seconds as a proportion of device capacity, between 0 and 1 or UNDEF
 min_charge: minimum charge as a proportion of device capacity, between 0 and 1 or UNDEF
 eff_charge: charging efficiency, between 0 and 1 (equal to sqrt(roundtrip efficiency))
 eff_discharge: discharging efficiency, between 0 and 1 (equal to sqrt(roundtrip effiency))
@@ -14,3 +15,5 @@ usable_start: the start of the time window the device can be used, an int betwee
 usable_end: the end of the time window the device can be used, an int between 0 and 23 representing hour (applicable to V2G)
 
 **Should add normal lifetime quality deterioriation as part of marginal cost, cost per second, (or maybe separate field)
+
+flywheel is sub-10,000 rpm
