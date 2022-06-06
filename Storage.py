@@ -1,5 +1,5 @@
 import csv
-import ast
+import ast #Library for syntax parsing
 import operator as op
 
 # supported operators
