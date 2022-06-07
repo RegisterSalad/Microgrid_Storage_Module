@@ -39,31 +39,39 @@ class StorageSuite:
         for device in self.device_data:
             self.storage_suite[device] = Storage(type=device)
 
-#string.replace(old, new) (immutable)
+#string.replace(old, new) (immutable) [replace() syntax]
+
+# need to account for some types 
+
+
 
 class Storage:
-    def __init__(self, ss, type, cap, power, s_wind, e_wind):
+    def __init__(self, ss: StorageSuite, type: str, cap: float, power: float, start_window: int, end_window: int):
         #fixed
         self.TYPE = type
-        self.CAP = cap
-        self.POWER = power
-        self.s_wind = s_wind
-        self.e_wind = e_wind
-        if ss.device_data['cap_power_ind']:
-            pass
+        self.CAP = cap # in kWh
+        self.POWER = power # in kW
+        if self.POWER == None:
+            self.POWER = cap * ss.device_data['max_cont_discharge']
+        self.start_window = start_window
+        self.end_window = end_window
+        if bool(ss.device_data['cap_power_ind']):
+            self.capital_cost = capital_cost()
         else:
-            self.capital_cost = ss.device_data['capital_cost'] * self.power
+            self.capital_cost = ss.device_data['capital_cost'] * cap
         self.MAX_SOC = ss.device_data['max_charge']
         self.MIN_SOC = ss.device_data['min_charge']
-        self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate']
-        self.MIN_CHARGE_RATE = ss.device_data['min_charge_rate']
-        self.MAX_CONT_DISCHARGE = ss.device_data['max_cont_discharge']
+        self.MAX_SOC_CAP = ss.device_data['max_charge'] * cap
+        self.MIN_SOC_CAP = ss.device_data['min_charge'] * cap
+        #self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate'] * 
+        #self.MIN_CHARGE_RATE = ss.device_data['min_charge_rate']
+        #self.MAX_CONT_DISCHARGE = ss.device_data['max_cont_discharge'] 
         
-        self.MIN_DISCHARGE = ss.device_data['min_discharge']
+        #self.MIN_DISCHARGE = ss.device_data['min_discharge'] * cap
 
      
         #calculated
-        self.peak_discharge = ss.device_data['max_peak_discharge'] * self.MAX_CONT_DISCHARGE
+        self.PEAK_DISCHARGE = ss.device_data['max_peak_discharge'] * self.POWER # assumed 10s capability
         self.FORMULA_EFF_CHARGE = ss.device_data['eff_charge'].replace("x", "self.soc")
         def eff_charge():
             return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc)))
