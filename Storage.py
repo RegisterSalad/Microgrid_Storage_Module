@@ -43,6 +43,9 @@ class StorageSuite:
 
 # need to account for some types 
 
+# v2g is going to have to have unit capacity multiplied by number of houses
+# probably similar to how PV generation is determined
+
 
 
 class Storage:
