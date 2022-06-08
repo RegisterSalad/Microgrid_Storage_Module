@@ -74,20 +74,20 @@ class Storage:
         self.PEAK_DISCHARGE = ss.device_data['max_peak_discharge'] * self.POWER # assumed 10s peak capability, in kW
         self.FORMULA_EFF_CHARGE = ss.device_data['eff_charge'].replace("x", "self.soc")
         def eff_charge(): # charge effiency function
-            return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc)))
+            return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc))).replace("'", "")
         # may need to adjust formulae in current CSV to take proportional SOC rather than current_charge
         # would just have to divide each x in the formula by the capacity of the flywheel used for modelling, probably 29kWh
-        self.FORMULA_EFF_DISCHARGE = ss.device_data['eff_discharge'].replace("x", "self.soc")
+        self.FORMULA_EFF_DISCHARGE = ss.device_data['eff_discharge'].replace("x", "self.soc").replace("'", "")
         def eff_discharge(): # discharge effiency function
             return eval_expr(self.FORMULA_EFF_DISCHARGE.replace("self.soc", str(self.soc)))
         
-        self.FORMULA_SELF_DISCHARGE = ss.device_data['self_discharge'].replace("x", "self.soc")
+        self.FORMULA_SELF_DISCHARGE = ss.device_data['self_discharge'].replace("x", "self.soc").replace("'", "")
         def self_discharge(): # self-discharge rate, in kW
             return eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)))
 
         self.FORMULA_CAPITAL_COST = ss.device_data['capital_cost']
         def capital_cost(): # independent capacity and power capital cost formula
-            return eval_expr(self.FORMULA_CAPITAL_COST.replace("X", str(self.CAP)).replace("Y", str(self.POWER))) * self.CAP
+            return eval_expr(self.FORMULA_CAPITAL_COST.replace("X", str(self.CAP)).replace("Y", str(self.POWER)).replace("'", "")) * self.CAP
 
             
         self.MARGINAL_COST = ss.device_data['marginal_cost'] # cost to use device per kW in/out, in USD
