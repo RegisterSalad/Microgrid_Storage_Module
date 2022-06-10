@@ -122,6 +122,7 @@ class MicrogridGenerator:
         self.nb_microgrids=nb_microgrid
         self.timestep=1
         self.path=path
+        self.second_timescale = second_timescale
 
 
     ###########################################
@@ -174,7 +175,7 @@ class MicrogridGenerator:
     #     ts_load = np.random(shape)
     #     annual_consumption = annual_consumption
 
-    def _get_pv_ts(self):
+    def _get_pv_ts(self, stime: bool = False):
         """ Function to get a random PV file."""
         #open pv folder
         # get list of file
@@ -183,7 +184,7 @@ class MicrogridGenerator:
         path = self.path+'/data/pv/'
         return self._get_random_file(path)
 
-    def _get_load_ts(self):
+    def _get_load_ts(self, stime: bool = False):
         """ Function to get a random load file. """
         #open load folder
         # get list of file
@@ -192,7 +193,7 @@ class MicrogridGenerator:
         path = self.path+'/data/load/'
         return self._get_random_file(path)
 
-    def _get_wind_ts(self):
+    def _get_wind_ts(self, stime: bool = False):
         """ Function to get a random wind file. """
         #open load folder
         # get list of file
@@ -201,7 +202,7 @@ class MicrogridGenerator:
         path = self.path+'/data/wind/'
         return self._get_random_file(path)
 
-    def _get_co2_ts(self):
+    def _get_co2_ts(self, stime: bool = False):
         """ Function to get a random wind file. """
         # open load folder
         # get list of file
@@ -237,6 +238,7 @@ class MicrogridGenerator:
             'efficiency':efficiency,
             'soc_0':min(max(np.random.randn(), soc_min),soc_max),
             'cost_cycle':0.02
+
         }
         return battery
 
@@ -284,23 +286,15 @@ class MicrogridGenerator:
         return price_import, price_export
 
 
-    def _get_grid(self, rated_power=1000, grid_type = 'perfect', pmin=0.2, price_scenario=0, price_export = 0, price_import =0.3):
+    def _get_grid(self, rated_power=1000, weak_grid=0, pmin=0.2, price_scenario=0, price_export = 0, price_import =0.3):
         """ Function generates a dictionnary with the grid information. """
-        """ Custom Functionality: Disaster
-            Date: 5/24/2022
-        """
-        if grid_type == 'disaster':
-            rand_outage_per_hour = np.np.random.randn()*3/4 +0.25
-            outages = outages + rand_outage_per_hour
-            grid_ts = self._generate_disaster_grid_profile(rand_outage_per_hour, rand_duration)
-            pass
 
-        elif grid_type == 'weak':
+        if weak_grid == 1:
             rand_outage_per_day = np.random.randn()*3/4 +0.25
             rand_duration = np.random.randint(low=1, high =8)
             grid_ts = self._generate_weak_grid_profile( rand_outage_per_day, rand_duration,8760/self.timestep)
 
-        elif grid_type == 'perfect':
+        else:
             #grid_ts=pd.DataFrame([1+i*0 for i in range(int(np.floor(8760/self.timestep)))], columns=['grid_status'])
             grid_ts = pd.DataFrame(np.ones(int(np.floor(8760 / self.timestep))),
                                    columns=['grid_status'])
@@ -324,14 +318,6 @@ class MicrogridGenerator:
         }
 
         return grid
-
-
-    def _generate_disaster_grid_profile(self, outage_per_day, duration_of_outage,nb_time_step_per_year):
-        """Function that generates and outage time series to be used in the microgrids with a disaster grid"""
-        pass
-
-
-
 
     def _generate_weak_grid_profile(self, outage_per_day, duration_of_outage,nb_time_step_per_year):
         """ Function generates an outage time series to be used in the microgrids with a weak grid. """
@@ -358,8 +344,6 @@ class MicrogridGenerator:
     ###########################################
     # sizing functions
     ###########################################
-
-
     def _size_mg(self, load, size_load=1):
         '''
          Function that returns a dictionnary with the size of each component of a microgrid. We chose to define PV
@@ -408,18 +392,12 @@ class MicrogridGenerator:
     #generate the microgrid
     ###########################################
 
-    def generate_microgrid(self, verbose=True, grid_type = 'weak'):
+    def generate_microgrid(self, verbose=True, second_timescale: bool = False):
         """ Function used to generate the nb_microgrids to append them to the microgrids list. """
 
         for i in range(self.nb_microgrids):
             #size=self._size_mg()
-            if grid_type == 'disaster':
-                self.microgrids.append(self._create_microgrid(grid_type = 'disaster'))
-            elif grid_type == 'weak':
-                self.microgrids.append(self._create_microgrid(grid_type = 'weak'))
-            elif grid_type == 'perfect':
-                self.microgrids.append(self._create_microgrid())
-
+            self.microgrids.append(self._create_microgrid(second_timescale = second_timescale))
         
         if verbose == True:
             self.print_mg_parameters()
@@ -458,7 +436,7 @@ class MicrogridGenerator:
         else:
             return size_load
 
-    def _create_microgrid(self, grid_type = 'perfect'):
+    def _create_microgrid(self, second_timescale: bool = False):
         """
         Function used to create one microgrid. First selecting a load file, and a load size  and a randome architecture
         and then size the other components of the microgrid depending on the load size. This function also initializes
@@ -473,7 +451,7 @@ class MicrogridGenerator:
 
         architecture = {'PV':1, 'battery':1, 'genset':bin_genset, 'grid':bin_grid}
         size_load = self._size_load()
-        load = self._scale_ts(self._get_load_ts(), size_load, scaling_method='max') #obtain dataframe of loads
+        load = self._scale_ts(self._get_load_ts(stime = second_timescale), size_load, scaling_method='max') #obtain dataframe of loads
         size = self._size_mg(load, size_load) #obtain a dictionary of mg sizing components
         column_actions=[]
         column_actual_production=[]
@@ -508,7 +486,7 @@ class MicrogridGenerator:
             column_actions.append('pv_consummed')
             column_actions.append('pv_curtailed')
             column_actions.append('pv')
-            pv = pd.DataFrame(self._scale_ts(self._get_pv_ts(), size['pv'], scaling_method='max'))
+            pv = pd.DataFrame(self._scale_ts(self._get_pv_ts(stime = second_timescale), size['pv'], scaling_method='max'))
             df_status['pv'] = [np.around( pv.iloc[0].values[0],1)]
 
         if architecture['battery']==1:
@@ -549,12 +527,13 @@ class MicrogridGenerator:
         grid_spec=0
 
         if architecture['grid']==1:
-            price_scenario = np.random.randint(low=1, high=3)
-            grid = self._get_grid(rated_power=size['grid'], grid_type = grid_type, price_scenario=price_scenario)
-            if grid_type == 'weak':
-                architecture['genset'] = 1
-                df_parameters['grid_weak'] = 1
 
+            rand_weak_grid = np.random.randint(low=0, high=2)
+            price_scenario = np.random.randint(low=1, high=3)
+            if rand_weak_grid == 1:
+                architecture['genset'] = 1
+            grid = self._get_grid(rated_power=size['grid'], weak_grid=rand_weak_grid, price_scenario=price_scenario)
+            df_parameters['grid_weak'] = rand_weak_grid
             df_parameters['grid_power_import'] = grid['grid_power_import']
             df_parameters['grid_power_export'] = grid['grid_power_export']
             grid_ts = grid['grid_ts']
@@ -568,8 +547,9 @@ class MicrogridGenerator:
             column_cost.append('grid_export')
             df_status['grid_status'] = [grid_ts.iloc[0,0]]
             #todo Switch back to random file to generate the new version of pymgrid25
-            grid_co2_ts = self._get_co2_ts() 
+            grid_co2_ts = self._get_co2_ts(stime = second_timescale) 
             df_status['grid_co2'] = [grid_co2_ts.iloc[0, 0]]
+
             grid_price_import_ts = grid['grid_price_import']
             grid_price_export_ts = grid['grid_price_export']
             df_status['grid_price_import'] = [grid_price_import_ts.iloc[0, 0]]

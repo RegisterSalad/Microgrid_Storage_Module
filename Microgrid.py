@@ -349,8 +349,8 @@ class Microgrid:
         #list of parameters
         #this is a static dataframe: parameters of the microgrid that do not change with time
 
-        #self._param_check(parameters)
-
+        # self._param_check(parameters)
+        
         self.parameters = parameters['parameters']
         self.architecture = parameters['architecture']
         #different timeseries
@@ -409,11 +409,9 @@ class Microgrid:
 
     def _param_check(self, parameters):
         """Simple parameter checks"""
-
         # Check parameters
         if not isinstance(parameters, dict):
             raise TypeError('parameters must be of type dict, is ({})'.format(type(parameters)))
-
 
         # Check architecture
         try:
@@ -447,13 +445,11 @@ class Microgrid:
                 raise TypeError('parameters[\'{}\'] must be of type pd.DataFrame, is ({})'.format(key, type(df)))
 
 
-
     def set_horizon(self, horizon):
         """Function used to change the horizon of the simulation."""
         self.horizon = horizon
-
     def set_cost_co2(self, co2_cost):
-        """Function used to change the horizon of the simulation."""
+        """Function used to change the co2 cost of the simulation."""
         self.parameters['cost_co2'] = co2_cost
 
     def get_data(self):
