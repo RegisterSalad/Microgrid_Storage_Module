@@ -50,8 +50,8 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 24 #in hours
-DEFAULT_TIMESTEP = 1 #in hours
+DEFAULT_HORIZON = 84600 #in Seconds per day
+DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
 '''
@@ -942,15 +942,14 @@ class Microgrid:
 
         if p_export <0:
             p_export = 0
-
-        if p_import > self._zero and p_export > self._zero:
-        	pass
-            #print ('cannot import and export at the same time')
-            #todo how to deal with that?
-
         if p_import > self.parameters['grid_power_import'].values[0]:
             p_import = self.parameters['grid_power_import'].values[0]
 
+        if p_import > self._zero and p_export > self._zero:
+            pass
+            #print ('cannot import and export at the same time')
+            #todo how to deal with that?
+            
         if p_export > self.parameters['grid_power_export'].values[0]:
             p_export = self.parameters['grid_power_export'].values[0]
 
