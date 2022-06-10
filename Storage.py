@@ -75,13 +75,10 @@ class Storage:
         #calculated
         self.PEAK_DISCHARGE = eval_expr(ss.device_data[type]['max_peak_discharge'].replace("x", str(self.POWER))) * self.POWER # assumed 10s peak capability, in kW
         self.FORMULA_EFF_CHARGE = ss.device_data[type]['eff_charge'].replace("x", "self.soc")
-        def eff_charge(): # charge effiency function
-            return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc))).replace("'", "")
+        
         # may need to adjust formulae in current CSV to take proportional SOC rather than current_charge
         # would just have to divide each x in the formula by the capacity of the flywheel used for modelling, probably 29kWh
         self.FORMULA_EFF_DISCHARGE = ss.device_data[type]['eff_discharge'].replace("x", "self.soc").replace("'", "")
-        def eff_discharge(): # discharge effiency function
-            return eval_expr(self.FORMULA_EFF_DISCHARGE.replace("self.soc", str(self.soc)))
         
         self.FORMULA_SELF_DISCHARGE = ss.device_data[type]['self_discharge'].replace("x", "self.soc").replace("'", "") # where x is SoC
         
@@ -100,21 +97,30 @@ class Storage:
         self.resp_time = ss.device_data[type]['resp_time'] # time it takes for device to realize command, in seconds
         self.soc = 0.85 # state of charge as a proportion of capacity
         self.soc_cap = self.soc * self.CAP # state of charge in kWh
-        def current_charge():
-            return self.soc * self.CAP
 
         #user/AI-defined
         pass
 
     def self_discharge(self): # self-discharge rate, in SOC
-            return eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
-            #parsed_expr = ast.parse(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
-            #return ast.literal_eval(parsed_expr)
+        return eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
+        #parsed_expr = ast.parse(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
+        #return ast.literal_eval(parsed_expr)
+    def eff_charge(self): # charge effiency function
+        return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc)).replace("'", ""))
+    def eff_discharge(self): # discharge effiency function
+        return eval_expr(self.FORMULA_EFF_DISCHARGE.replace("self.soc", str(self.soc)))
+    def current_charge(self):
+        return self.soc * self.CAP
+        
     
 
 if __name__ == "__main__":
     test_ss = StorageSuite('data/energy_storage_devices_v5.csv')
     print(test_ss.storage_suite['li-ion'].self_discharge())
+    print(test_ss.storage_suite['li-ion'].CAPITAL_COST)
+    print(test_ss.storage_suite['li-ion'].eff_charge())
+    print(test_ss.storage_suite['li-ion'].eff_discharge())
+    print(test_ss.storage_suite['li-ion'].current_charge())
 
     #print(test_ss.device_data)
     #print(test_ss.storage_suite['flywheel'].CAPITAL_COST)
