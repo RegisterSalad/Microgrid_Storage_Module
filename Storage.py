@@ -133,7 +133,5 @@ if __name__ == "__main__":
 #or even separate suites for each?
 
 # NEXT STEPS:
-# 1. Normalize formulae that were based on a specific unit (i.e. cap of 29kWh)
+# 1. Check that formulae are normalized rather than correpsonding to specific caps, powers, or other attributes
 # 2. Research aggregator response time
-# 3. Test formulae
-# 4. Test initialization of StorageSuite
