@@ -40,6 +40,14 @@ class StorageSuite:
         for device in self.storage_suite:
             self.storage_suite[device].modify(param[device])
 
+    def print_variables(self):
+        for device in self.storage_suite:
+            self.storage_suite[device].print_variables()
+
+    def print_properties(self):
+        for device in self.storage_suite:
+            self.storage_suite[device].print_properties()
+
 # StorageSuite
 # Inputs:
 #   param: a dict(device->dict(parameter->value)) where
