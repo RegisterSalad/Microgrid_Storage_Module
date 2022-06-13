@@ -25,19 +25,24 @@ def eval_(node):
     else:
         raise TypeError(node)
 
-class StorageSuite:
+class StorageData:
     def __init__(self, filename):
-        self.storage_suite = {}
         self.device_data = {}
         with open(filename, newline='', encoding='utf-8-sig') as devices_file:
             reader = csv.DictReader(devices_file)
             for row in reader:
                 self.device_data[row['type']] = row
+
+# StorageSuite
+# Inputs:
+#   param: a dict(device->dict(parameter->value)) where
+#       - the parent dict's keys are each device (str) in data, the value of each is a
+#       - dict of parameter (i.e. cap, or power if applicable) to its value
+class StorageSuite:
+    def __init__(self, data: StorageData, param: dict):
+        self.storage_suite = {}
         for device in self.device_data:
-            if device == "flow":
-                self.storage_suite[device] = Storage(ss=self, type=device, cap=100, power=10)
-            else:
-                self.storage_suite[device] = Storage(ss=self, type=device, cap=100)
+            self.storage_suite[device] = Storage(data=self.data, type=device, cap=param[device]['cap'], power=param[device]['power'])
 
 #string.replace(old, new) (immutable) [replace() syntax]
 
@@ -49,7 +54,7 @@ class StorageSuite:
 
 
 class Storage:
-    def __init__(self, ss: StorageSuite, type: str, cap: float, power: float = None, start_window: int = None, end_window: int = None):
+    def __init__(self, data: dict, type: str, cap: float, power: float = None, start_window: int = None, end_window: int = None):
         
         
         #fixed
@@ -133,5 +138,6 @@ if __name__ == "__main__":
 #or even separate suites for each?
 
 # NEXT STEPS:
-# 1. Check that formulae are normalized rather than correpsonding to specific caps, powers, or other attributes
-# 2. Research aggregator response time
+# 1. Write print function to print current state of StorageSuite
+# 2. Check that formulae are normalized rather than correpsonding to specific caps, powers, or other attributes
+# 3. Research aggregator response time
