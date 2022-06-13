@@ -69,23 +69,23 @@ class StorageSuite:
 
 
 class Storage:
-    def __init__(self, data: dict, type: str, cap: float, power: float = None, start_window: int = None, end_window: int = None):
+    def __init__(self, data: dict, type: str):
         
         
         #fixed
         self.DATA = data
         self.TYPE = type
-        self.cap = cap # in kWh
-        self.power = power # in kW
+        self.cap = None # in kWh
+        self.power = None # in kW
         if self.power == None:
-            self.power = cap * eval_expr(self.data['max_cont_discharge']) # uses default power to capacity ratio for given type
-        self.START_WINDOW = start_window # start time that device can be used (V2G), in seconds of the day out of 86,400
-        self.END_WINDOW = end_window # end time that device can be used (V2G), in seconds of the day out of 86,400
+            self.power = self.cap * eval_expr(self.data['max_cont_discharge']) # uses default power to capacity ratio for given type
+        self.START_WINDOW = self.data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
+        self.END_WINDOW = self.data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
     
         self.MAX_SOC = data['max_charge'] # maximum charge as a proportion of capacity
         self.MIN_SOC = data['min_charge'] # minimum charge as a proportion of capacity
-        self.max_soc_cap = data['max_charge'] * cap # maximum charge in kWh
-        self.min_soc_cap = data['min_charge'] * cap # minimum charge in kWh
+        self.max_soc_cap = data['max_charge'] * self.cap # maximum charge in kWh
+        self.min_soc_cap = data['min_charge'] * self.cap # minimum charge in kWh
         #self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate'] * 
         #self.MIN_CHARGE_RATE = ss.device_data['min_charge_rate']
         #self.MAX_CONT_DISCHARGE = ss.device_data['max_cont_discharge'] 
