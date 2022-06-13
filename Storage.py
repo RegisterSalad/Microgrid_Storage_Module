@@ -108,10 +108,7 @@ class Storage:
         def capital_cost(): # independent capacity and power capital cost formula
             return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap)).replace("y", str(self.power)).replace("'", "")) * self.cap
 
-        if bool(data['cap_power_ind']):
-            self.capital_cost = capital_cost() # if capital cost is a function of both power and capacity, in USD
-        else:
-            self.capital_cost = data['capital_cost'] * cap # if capital cost is primarily a function of capacity only, in USD
+        self.capital_cost = capital_cost()
 
         self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kW in/out, in USD
         #self.ramp_speed = ss.device_data['ramp_speed']
@@ -141,11 +138,7 @@ class Storage:
             self.power = self.cap * eval_expr(self.data['max_cont_discharge'])
         self.max_soc_cap = self.data['max_charge'] * self.cap
         self.min_soc_cap = self.data['min_charge'] * self.cap
-        if bool(self.data['cap_power_ind']):
-            self.capital_cost = self.capital_cost()
-        else:
-            self.capital_cost = self.data['capital_cost'] * self.cap
-            # should streamline this so it's just a formula regardless of linear proportionality
+        self.capital_cost = self.capital_cost()
 
     def print_properties(self):
         print("**************************\n")
