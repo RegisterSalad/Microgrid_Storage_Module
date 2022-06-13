@@ -25,9 +25,10 @@ def eval_(node):
     else:
         raise TypeError(node)
 
-class StorageData:
+class StorageSuite:
     def __init__(self, filename):
         self.device_data = {}
+        self.storage_suite = {}
         with open(filename, newline='', encoding='utf-8-sig') as devices_file:
             reader = csv.DictReader(devices_file)
             for row in reader:
@@ -38,11 +39,13 @@ class StorageData:
 #   param: a dict(device->dict(parameter->value)) where
 #       - the parent dict's keys are each device (str) in data, the value of each is a
 #       - dict of parameter (i.e. cap, or power if applicable) to its value
-class StorageSuite:
-    def __init__(self, data: StorageData, param: dict):
-        self.storage_suite = {}
+
+# Wondering if a StorageSuite class is needed or if this can just be implemented within the code.
+# I'll have to think about this.
+# To avoid excessive RAM usage, might reuse Storage classes between microgrids and just overwrite them
+# - could just write their data/parameters to a text file before moving on to the next microgrid
         for device in self.device_data:
-            self.storage_suite[device] = Storage(data=self.data, type=device, cap=param[device]['cap'], power=param[device]['power'])
+            self.storage_suite[device] = Storage(data=self.data.device_data[device], type=device)
 
 #string.replace(old, new) (immutable) [replace() syntax]
 
@@ -62,14 +65,14 @@ class Storage:
         self.CAP = cap # in kWh
         self.POWER = power # in kW
         if self.POWER == None:
-            self.POWER = cap * eval_expr(ss.device_data[type]['max_cont_discharge']) # uses default power to capacity ratio for given type
+            self.POWER = cap * eval_expr(self.data['max_cont_discharge']) # uses default power to capacity ratio for given type
         self.START_WINDOW = start_window # start time that device can be used (V2G), in seconds of the day out of 86,400
         self.END_WINDOW = end_window # end time that device can be used (V2G), in seconds of the day out of 86,400
     
-        self.MAX_SOC = ss.device_data[type]['max_charge'] # maximum charge as a proportion of capacity
-        self.MIN_SOC = ss.device_data[type]['min_charge'] # minimum charge as a proportion of capacity
-        self.MAX_SOC_CAP = ss.device_data[type]['max_charge'] * cap # maximum charge in kWh
-        self.MIN_SOC_CAP = ss.device_data[type]['min_charge'] * cap # minimum charge in kWh
+        self.MAX_SOC = self.data['max_charge'] # maximum charge as a proportion of capacity
+        self.MIN_SOC = self.data['min_charge'] # minimum charge as a proportion of capacity
+        self.MAX_SOC_CAP = self.data['max_charge'] * cap # maximum charge in kWh
+        self.MIN_SOC_CAP = self.data['min_charge'] * cap # minimum charge in kWh
         #self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate'] * 
         #self.MIN_CHARGE_RATE = ss.device_data['min_charge_rate']
         #self.MAX_CONT_DISCHARGE = ss.device_data['max_cont_discharge'] 
@@ -78,28 +81,28 @@ class Storage:
 
      
         #calculated
-        self.PEAK_DISCHARGE = eval_expr(ss.device_data[type]['max_peak_discharge'].replace("x", str(self.POWER))) * self.POWER # assumed 10s peak capability, in kW
-        self.FORMULA_EFF_CHARGE = ss.device_data[type]['eff_charge'].replace("x", "self.soc")
+        self.PEAK_DISCHARGE = eval_expr(self.data['max_peak_discharge'].replace("x", str(self.POWER))) * self.POWER # assumed 10s peak capability, in kW
+        self.FORMULA_EFF_CHARGE = self.data['eff_charge'].replace("x", "self.soc")
         
         # may need to adjust formulae in current CSV to take proportional SOC rather than current_charge
         # would just have to divide each x in the formula by the capacity of the flywheel used for modelling, probably 29kWh
-        self.FORMULA_EFF_DISCHARGE = ss.device_data[type]['eff_discharge'].replace("x", "self.soc").replace("'", "")
+        self.FORMULA_EFF_DISCHARGE = self.data['eff_discharge'].replace("x", "self.soc").replace("'", "")
         
-        self.FORMULA_SELF_DISCHARGE = ss.device_data[type]['self_discharge'].replace("x", "self.soc").replace("'", "") # where x is SoC
+        self.FORMULA_SELF_DISCHARGE = self.data['self_discharge'].replace("x", "self.soc").replace("'", "") # where x is SoC
         
 
-        self.FORMULA_CAPITAL_COST = ss.device_data[type]['capital_cost']
+        self.FORMULA_CAPITAL_COST = self.data['capital_cost']
         def capital_cost(): # independent capacity and power capital cost formula
             return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.CAP)).replace("y", str(self.POWER)).replace("'", "")) * self.CAP
 
-        if bool(ss.device_data[type]['cap_power_ind']):
+        if bool(self.data['cap_power_ind']):
             self.CAPITAL_COST = capital_cost() # if capital cost is a function of both power and capacity, in USD
         else:
-            self.CAPITAL_COST = ss.device_data[type]['capital_cost'] * cap # if capital cost is primarily a function of capacity only, in USD
+            self.CAPITAL_COST = self.data['capital_cost'] * cap # if capital cost is primarily a function of capacity only, in USD
 
-        self.MARGINAL_COST = ss.device_data[type]['marginal_cost'] # cost to use device per kW in/out, in USD
+        self.MARGINAL_COST = self.data['marginal_cost'] # cost to use device per kW in/out, in USD
         #self.ramp_speed = ss.device_data['ramp_speed']
-        self.resp_time = ss.device_data[type]['resp_time'] # time it takes for device to realize command, in seconds
+        self.resp_time = self.data['resp_time'] # time it takes for device to realize command, in seconds
         self.soc = 0.85 # state of charge as a proportion of capacity
         self.soc_cap = self.soc * self.CAP # state of charge in kWh
 
