@@ -50,7 +50,7 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 84600 #in Seconds per day
+DEFAULT_HORIZON = 172800 #in Seconds in 2 days
 DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
