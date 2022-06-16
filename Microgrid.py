@@ -20,6 +20,7 @@ You should have received a copy of the GNU Lesser General Public License along w
 
 """
 
+from grpc import Status
 import pandas as pd
 import numpy as np
 from copy import copy
@@ -50,7 +51,11 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
+<<<<<<< HEAD
+DEFAULT_HORIZON = 172800 #in Seconds per day
+=======
 DEFAULT_HORIZON = 172800 #in Seconds in 2 days
+>>>>>>> 43708f7c3e1edfbd979e25be8ccc9a78ff149bb6
 DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
@@ -604,7 +609,27 @@ class Microgrid:
 
         return forecast_import, forecast_export
 
+    # def run(self, control_dict) -> dict:
+    #     curret_status: dict = { 
+    #                             'current_load': self._load_ts[self._tracking_timestep], #kW
+    #                             'current_pv_generated': self._pv_ts[self._tracking_timestep], #kW
+    #                             'current_pv_consumed': 0, # kWh
+    #                             'current_genset': 0, # On or off
+    #                             'current_import': 0, # On or off  
+    #                             'current_export': 0, # On or off
+    #                             'current_grid': self._grid_status_ts[index], # On or off
+    #                             'current': 0
+    #                         }
 
+    #     new_status: dict = { 
+    #                             'new_load': self.load,
+    #                             'new_pv': self.pv,
+    #                             'new_genset': control_dict['genset'],
+    #                             'new_import': control_dict['import'],
+    #                             'new_export': control_dict['export'],
+    #                             'new_grid': self._grid_status_ts[]
+    #                         }
+    #     tracking
 
     #if return whole pv and load ts, the time can be counted in notebook
     def run(self, control_dict):
@@ -745,7 +770,7 @@ class Microgrid:
         self.reset()
 
     def update_variables(self):
-        """ Function that updates the variablers containing the parameters of the microgrid changing with time. """
+        """ Function that updates the variables containing the parameters of the microgrid changing with time. """
 
         if self._data_set_to_use == 'training':
             self.pv = self._pv_train.iloc[self._tracking_timestep, 0]
@@ -757,7 +782,7 @@ class Microgrid:
 
         if self._data_set_to_use == 'testing':
             self.pv = self._pv_test.iloc[self._tracking_timestep, 0]
-            self.load = self._load_test.iloc[self._tracking_timestep, 0]
+            self.load =  self._load_test.iloc[self._tracking_timestep, 0]
 
             self._next_pv = self._pv_test.iloc[self._tracking_timestep+1, 0]
             self._next_load = self._load_test.iloc[self._tracking_timestep+1, 0]
@@ -870,21 +895,21 @@ class Microgrid:
         return df
 
 
-    def _update_status(self, production_dict, df, next_load, next_pv, next_grid = 0, next_price_import =0, next_price_export = 0, next_co2 = 0):
+    def _update_status(self, production_dict, input_dict, next_load, next_pv, next_grid = 0, next_price_import =0, next_price_export = 0, next_co2 = 0):
         """ This function update the parameters of the microgrid that change with time. """
         #self.df_status = self.df_status.append(self.new_row, ignore_index=True)
 
-        if not isinstance(df, dict):
-            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(df)))
+        if not isinstance(input_dict, dict):
+            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(input_dict)))
 
         new_dict = {
             'load': next_load,
                     'pv': next_pv,
-            'hour':self._tracking_timestep%24,
+            'hour':self._tracking_timestep%3600,
         }
         new_soc =np.nan
         if self.architecture['battery'] == 1:
-            new_soc = df['battery_soc'][-1] + (production_dict['battery_charge'] * self.parameters['battery_efficiency'].values[0]
+            new_soc = input_dict['battery_soc'][-1] + int(production_dict['battery_charge'] * self.parameters['battery_efficiency'].values[0]
                                                - production_dict['battery_discharge'] / self.parameters['battery_efficiency'].values[0]) / self.parameters['battery_capacity'].values[0]
             #if col == 'net_load':
             capa_to_charge = max(
@@ -909,14 +934,12 @@ class Microgrid:
             new_dict['grid_price_export'] = next_price_export
             new_dict['grid_co2'] = next_co2
 
-        for j in df:
-            df[j].append(new_dict[j])
+        for j in input_dict:
+            input_dict[j].append(new_dict[j])
 
         #df = df.append(dict,ignore_index=True)
 
-
-
-        return df
+        return input_dict
 
 
     #now we consider all the generators on all the time (mainly concern genset)

@@ -227,13 +227,13 @@ class MicrogridGenerator:
             'rated_power':rated_power,
             'pmax':pmax,
             'pmin':pmin,
-            'fuel_cost':0.4,
+            'fuel_cost':0.4/3600,
             'co2':2,
         }
 
         return genset
 
-    def _get_battery(self, capa=1000, duration=4, pcharge=100, pdischarge=100, soc_max=1, soc_min=0.2, efficiency=0.9):
+    def _get_battery(self, capa=1000, duration=4, pcharge=100, pdischarge=100, soc_max=1, soc_min=0, efficiency=0.9):
         """ Function generates a dictionnary with the battery information. """
         battery={
             'capa':capa,
@@ -292,7 +292,7 @@ class MicrogridGenerator:
         price_import = []
         price_export = np.zeros((HORIZON,))
         for i in range(HORIZON):
-            price_import.append(0.11)
+            price_import.append(0.11/3600)
 
 
 
