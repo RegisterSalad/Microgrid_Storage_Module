@@ -3,6 +3,7 @@ import ast #Library for parsing formula syntax
 import operator as op
 from math import e
 import re
+from unittest.mock import NonCallableMagicMock
 
 # supported operators
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
@@ -47,6 +48,50 @@ class StorageSuite:
     def print_properties(self):
         for device in self.storage_suite:
             self.storage_suite[device].print_properties()
+
+    def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None):
+        device = self.storage_suite[stor_type]
+        power = device.power
+        if amount_wanted == None:
+            amount_wanted = device.eff_discharge() * amount_to_discharge
+        elif amount_to_discharge == None:
+            amount_to_discharge = amount_wanted / device.eff_discharge()
+        if (amount_wanted * 3600) > power:
+            raise ValueError("Tried to get " + stor_type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum available in a second is " + str(power/3600) + "kWh at " + str(power) + "kW.")
+        if (device.soc_cap - amount_to_discharge) < device.min_soc_cap:
+            raise ValueError("Tried to discharge " + stor_type + str(amount_to_discharge) + "kWh when there was only " + str(device.soc_cap - device.min_soc_cap) + "kWh left.")
+        device.soc_cap -= amount_to_discharge
+        device.soc = device.soc_cap / device.cap
+
+        econ_cost.cost += device.MARGINAL_COST * amount_wanted
+
+        return amount_wanted
+
+        #need to implement mechanism for tracking peak discharge usage
+
+    def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None):
+        device = self.storage_suite[stor_type]
+        power = device.power
+        if amount_to_charge == None:
+            amount_to_charge = device.eff_charge() * amount_to_supply
+        elif amount_to_supply == None:
+            amount_to_supply = amount_to_charge / device.eff_charge()
+        if (amount_to_charge * 3600) > power:
+            raise ValueError("Tried to charge " + stor_type + str(amount_to_charge) + "kWh at " + str(amount_to_charge*3600) + "kW when the maximum able to be charged in a second is " + str(power/3600) + "kWh at " + str(power) + "kW.")
+        if (device.soc_cap + amount_to_charge) > device.max_soc_cap:
+            raise ValueError("Tried to charge " + stor_type + str(amount_to_charge) + "kWh when there was only " + str(device.soc_cap - device.min_soc_cap) + "kWh of capacity left.")
+        device.soc_cap += amount_to_charge
+        device.soc = device.soc_cap / device.cap
+
+        econ_cost.cost += device.MARGINAL_COST * amount_wanted
+
+        return amount_wanted
+
+
+    def self_discharge_all(self):
+        for device in self.storage_suite:
+            self.storage_suite[device].self_discharge()
+
 
 # StorageSuite
 # Inputs:
@@ -94,7 +139,8 @@ class Storage:
 
      
         #calculated
-        self.PEAK_DISCHARGE = eval_expr(data['max_peak_discharge'].replace("x", str(self.power))) * self.power # assumed 10s peak capability, in kW
+        self.FORMULA_PEAK_DISCHARGE = data['max_peak_discharge'].replace("x", "self.cap").replace("y", "self.power")
+        
         self.FORMULA_EFF_CHARGE = data['eff_charge'].replace("x", "self.soc")
         
         # may need to adjust formulae in current CSV to take proportional SOC rather than current_charge
@@ -105,12 +151,15 @@ class Storage:
         
 
         self.FORMULA_CAPITAL_COST = data['capital_cost']
-        def capital_cost(): # independent capacity and power capital cost formula
-            return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap)).replace("y", str(self.power)).replace("'", "")) * self.cap
+        def peak_discharge(self):
+            return eval_expr(self.FORMULA_PEAK_DISCHARGE.replace("self.cap", str(self.cap)).replace("self.power", str(self.power))) # assumed 10s peak capability, in kW
+        def capital_cost(self): # independent capacity and power capital cost formula
+            return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap)).replace("y", str(self.power)).replace("'", ""))
 
-        self.capital_cost = capital_cost()
+        self.capital_cost = self.capital_cost()
+        self.peak_discharge = self.peak_discharge()
 
-        self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kW in/out, in USD
+        self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kWh in/out, in USD
         #self.ramp_speed = ss.device_data['ramp_speed']
         self.resp_time = data['resp_time'] # time it takes for device to realize command, in seconds
         self.soc = 0.85 # state of charge as a proportion of capacity
@@ -119,7 +168,7 @@ class Storage:
         #user/AI-defined
         pass
 
-    def self_discharge(self): # self-discharge rate, in SOC/s
+    def get_self_discharge_rate(self): # self-discharge rate, in SOC/s
         return eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
         #parsed_expr = ast.parse(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
         #return ast.literal_eval(parsed_expr)
@@ -130,12 +179,22 @@ class Storage:
     def current_charge(self):
         return self.soc * self.cap
     
+    def self_discharge(self):
+        delta_soc = self.get_self_discharge_rate
+        if (self.soc - delta_soc) < self.MIN_SOC:
+            self.soc = self.MIN_SOC
+            self.soc_cap = self.min_soc_cap
+        else:
+            self.soc -= delta_soc
+            self.soc_cap = self.max_soc_cap * self.soc    
+    
     def modify(self, param: dict):
         self.cap = param['cap']
         if 'power' in param:
             self.power = param['power']
         else:
             self.power = self.cap * eval_expr(self.data['max_cont_discharge'])
+        self.peak_discharge = eval_expr(data['max_peak_discharge'].replace("x", str(self.power))) * self.power
         self.max_soc_cap = self.data['max_charge'] * self.cap
         self.min_soc_cap = self.data['min_charge'] * self.cap
         self.capital_cost = self.capital_cost()
