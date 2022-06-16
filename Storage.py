@@ -57,11 +57,18 @@ class StorageSuite:
         elif amount_to_discharge == None:
             amount_to_discharge = amount_wanted / device.eff_discharge()
         if (amount_wanted * 3600) > power:
-            raise ValueError("Tried to get " + stor_type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum available in a second is " + str(power/3600) + "kWh at " + str(power) + "kW.")
+            if (amount_wanted * 3600) < device.peak_discharge and device.peak_time == 0:
+                raise ValueError("Peak time exhausted: Tried to get " + stor_type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum available this second is continuous power at " + str(power/3600) + "kWh at " + str(power) + "kW.")
+            if (amount_wanted * 3600) > device.peak_discharge:
+                raise ValueError("Tried to get " + stor_type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum peak available in a second is " + str(power/3600) + "kWh at " + str(power) + "kW.")
         if (device.soc_cap - amount_to_discharge) < device.min_soc_cap:
             raise ValueError("Tried to discharge " + stor_type + str(amount_to_discharge) + "kWh when there was only " + str(device.soc_cap - device.min_soc_cap) + "kWh left.")
         device.soc_cap -= amount_to_discharge
         device.soc = device.soc_cap / device.cap
+        if amount_wanted > power:
+            self.peak_time -= 1
+        elif self.peak_time != self.INIT_PEAK_TIME:
+            self.peak_time += 1
 
         econ_cost.cost += device.MARGINAL_COST * amount_wanted
 
@@ -83,9 +90,9 @@ class StorageSuite:
         device.soc_cap += amount_to_charge
         device.soc = device.soc_cap / device.cap
 
-        econ_cost.cost += device.MARGINAL_COST * amount_wanted
+        econ_cost.cost += device.MARGINAL_COST * amount_to_supply
 
-        return amount_wanted
+        return amount_to_supply
 
 
     def self_discharge_all(self):
@@ -164,6 +171,8 @@ class Storage:
         self.resp_time = data['resp_time'] # time it takes for device to realize command, in seconds
         self.soc = 0.85 # state of charge as a proportion of capacity
         self.soc_cap = self.soc * self.cap # state of charge in kWh
+        self.INIT_PEAK_TIME = data['peak_time']
+        self.peak_time = self.INIT_PEAK_TIME #how many consecutive seconds the device can still peak for
 
         #user/AI-defined
         pass
