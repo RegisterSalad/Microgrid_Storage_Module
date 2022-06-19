@@ -15,6 +15,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU Lesser General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
+from copyreg import dispatch_table
 import numpy as np
 import pandas as pd
 from . import Microgrid
@@ -25,6 +26,11 @@ import sys
 import pickle
 from IPython.display import display
 from pathlib import Path
+HOUR = 3600 # Number of seconds in hour
+DAY = 86400 # Number of seconds in day
+MONTH = 2631600 # Number of seconds in month
+YEAR =31579200 # Number of seconds in year (non-leap)
+
 
 # MICROGRID_DEFAULT_CONFIG : {
 #     'load_type':'Folder', #or 'File'
@@ -109,9 +115,10 @@ class MicrogridGenerator:
         #todo create an architecture argument to fix an architetcture (pymgrid10)
         self.microgrids= [] # generate a list of microgrid object
         #self.annual_load
-        self.nb_microgrids=nb_microgrid
         self.timestep=1
         self.path=path
+        self.grid_type_list = []
+        self.mg_index = 0
 
 
     ###########################################
@@ -149,11 +156,11 @@ class MicrogridGenerator:
     def _resize_timeseries(self, timeserie, current_time_step, new_time_step):
         """ Change the frequency of a time series. """
 
-        index = pd.date_range('1/1/2015 00:00:00', freq=str(int(current_time_step * 60)) + 'Min',
+        index = pd.date_range('1/1/2022 00:00:00', freq=str(int(current_time_step * 60)) + 'S',
                               periods=(len(timeserie)))  # , freq='0.9S')
 
         unsampled = pd.Series(timeserie, index=index)
-        resampled = unsampled.resample(rule=str(int(new_time_step)) + 'Min').mean().interpolate(method='linear')
+        resampled = unsampled.resample(rule=str(int(new_time_step)) + 'S').mean().interpolate(method='linear')
 
         return resampled
 
@@ -254,7 +261,7 @@ class MicrogridGenerator:
 
         return price_ts
 
-    def _get_electricity_tariff(self, scenario):
+    def _get_electricity_tariff(self):
         """
         Function to generate price time series based on existing tariffs.
         scenario == 1 representes the TOU A-6 2020 summer from PG&E (https://www.pge.com/tariffs/electric.shtml)
@@ -264,11 +271,11 @@ class MicrogridGenerator:
         )
         """
         # price_import = []
-        # price_export = np.zeros((3153600,))
+        # price_export = np.zeros((YEAR,))
 
         # if scenario == 1: # PGE A-6 TOU 2020 summer
 
-        #     for i in range(3153600):
+        #     for i in range(YEAR):
         #         if (i% 24 >= 12 and i%24 <18):
         #             price_import.append(0.59)
         #         elif (i% 24 < 8 or i%24 >=21):
@@ -278,7 +285,7 @@ class MicrogridGenerator:
 
 
         # if scenario == 2: # France Commercial TOU Marseille plage 5
-        #     for i in range(3153600):
+        #     for i in range(YEAR):
         #         if (i% 24 >= 0 and i%24 <5) or (i%24>=14 and i%24<17):
         #             price_import.append(0.08)
         #         else:
@@ -288,8 +295,8 @@ class MicrogridGenerator:
 
         # return price_import, price_export
         price_import = []
-        price_export = np.zeros((31536000,))
-        for i in range(31536000):
+        price_export = np.zeros((YEAR,))
+        for i in range(YEAR):
             price_import.append(0.11)
 
 
@@ -297,28 +304,29 @@ class MicrogridGenerator:
         return price_import, price_export
 
 
-    def _get_grid(self, rated_power=1000, weak_grid=0, pmin=0.2, price_scenario=0, price_export = 0, price_import =0.3):
+    def _get_grid(self, rated_power=1000):
         """ Function generates a dictionnary with the grid information. """
 
-        if weak_grid == 1:
-            rand_outage_per_day = np.random.randn()*3/4 +0.25
-            rand_duration = np.random.randint(low=1, high =8)
-            grid_ts = self._generate_weak_grid_profile( rand_outage_per_day, rand_duration,3153600/self.timestep)
-
+        if self.grid_type_list[self.mg_index] == 'weak': 
+            grid_ts = self._generate_weak_grid_profile(YEAR)
+            self.mg_index += 1
+        elif self.grid_type_list[self.mg_index] == 'disaster':
+            grid_ts = self._generate_disaster_grid_profile(YEAR)
+            self.mg_index += 1
         else:
-            #grid_ts=pd.DataFrame([1+i*0 for i in range(int(np.floor(3153600/self.timestep)))], columns=['grid_status'])
-            grid_ts = pd.DataFrame(np.ones(int(np.floor(3153600 / self.timestep))),
+            #grid_ts=pd.DataFrame([1+i*0 for i in range(int(np.floor(YEAR/self.timestep)))], columns=['grid_status'])
+            grid_ts = pd.DataFrame(np.ones(int(np.floor(YEAR))),
                                    columns=['grid_status'])
 
-        # Make sure grid_ts is of length 3153600
-        grid_ts = grid_ts.iloc[:3153600]
+        # Make sure grid_ts is of length YEAR
+        grid_ts = grid_ts.iloc[:YEAR]
 
-        # price_export = pd.DataFrame(self._get_grid_price_ts(price_export,3153600),
+        # price_export = pd.DataFrame(self._get_grid_price_ts(price_export,YEAR),
         #                            columns=['grid_price_export'])
-        # price_import = pd.DataFrame(self._get_grid_price_ts(price_import, 3153600),
+        # price_import = pd.DataFrame(self._get_grid_price_ts(price_import, YEAR),
         #                            columns=['grid_price_import'])
 
-        price_import, price_export = self._get_electricity_tariff(price_scenario)
+        price_import, price_export = self._get_electricity_tariff()
 
         grid={
             'grid_power_import':rated_power,
@@ -330,27 +338,44 @@ class MicrogridGenerator:
 
         return grid
 
-    def _generate_weak_grid_profile(self, outage_per_day, duration_of_outage,nb_time_step_per_year):
+    def _generate_weak_grid_profile(self,nb_time_step_per_year):
         """ Function generates an outage time series to be used in the microgrids with a weak grid. """
-
         #weak_grid_timeseries = np.random.random_integers(0,1, int(nb_time_step_per_year+1) ) #for a number of time steps, value between 0 and 1
-        #generate a timeseries of 3153600/timestep points based on np.random seed
+        #generate a timeseries of YEAR/timestep points based on np.random seed
         #profile of ones and zeros
+        duration_of_outage = np.random.randint(600,HOUR*3)
+        outage_per_day = np.random.randn()*3/4 +0.25
         weak_grid_timeseries = np.random.random(int(nb_time_step_per_year+1) ) #for a number of time steps, value between 0 and 1
-
-
-        weak_grid_timeseries = [0 if weak_grid_timeseries[i] < outage_per_day/24 else 1 for i in range(len(weak_grid_timeseries))]
-
-        timestep=3153600/nb_time_step_per_year
+        weak_grid_timeseries = [0 if weak_grid_timeseries[i] < outage_per_day/DAY else 1 for i in range(len(weak_grid_timeseries))]
         for i in range(len(weak_grid_timeseries)):
             if weak_grid_timeseries[i] == 0:
-                for j in range(1, int(duration_of_outage/timestep)):
+                duration_of_outage = np.random.randint(600,HOUR*3)
+                for j in range(1, int(duration_of_outage)):
                     if i-j > 0:
                         weak_grid_timeseries[i-j] = 0
         #print weak_grid_timeseries
 
         return pd.DataFrame(weak_grid_timeseries, columns=['grid_status']) #[0 if weak_grid_timeseries[i] < h_outage_per_day/24 else 1 for i in range(len(weak_grid_timeseries))]
 
+
+    def _generate_disaster_grid_profile(self,nb_time_step_per_year):
+        """ Function generates an outage time series to be used in the microgrids with a disaster grid. """
+        #disaster_grid_timeseries = np.random.random_integers(0,1, int(nb_time_step_per_year+1) ) #for a number of time steps, value between 0 and 1
+        #generate a timeseries of YEAR/timestep points based on np.random seed
+        #profile of ones and zeros
+        duration_of_outage = np.random.randint(HOUR,HOUR*10)
+        outage_per_day = np.random.randint(5, 11)
+        disaster_grid_timeseries = np.random.random(int(nb_time_step_per_year+1) ) #for a number of time steps, value between 0 and 1
+        disaster_grid_timeseries = [0 if disaster_grid_timeseries[i] < outage_per_day/DAY else 1 for i in range(len(disaster_grid_timeseries))]
+        for i in range(len(disaster_grid_timeseries)):
+            if disaster_grid_timeseries[i] == 0:
+                duration_of_outage = np.random.randint(HOUR,HOUR*10)
+                for j in range(1, int(duration_of_outage)):
+                    if i-j > 0:
+                        disaster_grid_timeseries[i-j] = 0
+        #print disaster_grid_timeseries
+
+        return pd.DataFrame(disaster_grid_timeseries, columns=['grid_status']) #[0 if disaster_grid_timeseries[i] < h_outage_per_day/24 else 1 for i in range(len(disaster_grid_timeseries))]
 
     ###########################################
     # sizing functions
@@ -403,15 +428,14 @@ class MicrogridGenerator:
     #generate the microgrid
     ###########################################
 
-    def generate_microgrid(self, verbose=True, minute: bool = False):
+    def generate_microgrid(self, verbose=True, minute: bool = False, grid_type = 'weak'):
         """ Function used to generate the nb_microgrids to append them to the microgrids list. """
         self.minute = minute
-        for i in range(self.nb_microgrids):
-            #size=self._size_mg()
-            self.microgrids.append(self._create_microgrid())
-        
+        self.grid_type_list.append(grid_type)
+        self.microgrids.append(self._create_microgrid())
+        self.nb_microgrids = len(self.microgrids)
         if verbose == True:
-            self.print_mg_parameters()
+            display(parameters)
 
 
 
@@ -540,12 +564,13 @@ class MicrogridGenerator:
 
         if architecture['grid']==1:
 
-            rand_weak_grid = np.random.randint(low=0, high=2)
-            price_scenario = np.random.randint(low=1, high=3)
-            if rand_weak_grid == 1:
+            # rand_weak_grid = np.random.randint(low=0, high=2)
+            # price_scenario = np.random.randint(low=1, high=3)
+
+            if self.grid_type_list[self.mg_index] == 'weak' or 'disaster':
                 architecture['genset'] = 1
-            grid = self._get_grid(rated_power=size['grid'], weak_grid=rand_weak_grid, price_scenario=price_scenario)
-            df_parameters['grid_weak'] = rand_weak_grid
+            grid = self._get_grid(rated_power=size['grid'])
+            df_parameters['grid_weak'] = self.grid_type_list[self.mg_index-1]
             df_parameters['grid_power_import'] = grid['grid_power_import']
             df_parameters['grid_power_export'] = grid['grid_power_export']
             grid_ts = grid['grid_ts']
