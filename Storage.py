@@ -4,6 +4,8 @@ import operator as op
 from math import e
 import re
 from unittest.mock import NonCallableMagicMock
+import gc
+import ctypes
 
 # supported operators
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
@@ -35,11 +37,23 @@ class StorageSuite:
             for row in reader:
                 self.device_data[row['type']] = row
         for device in self.device_data:
-            self.storage_suite[device] = Storage(data=self.data.device_data[device], type=device)
+            self.storage_suite[device] = Storage(data=self.device_data[device], type=device)
 
     def modify_ss(self, param: dict):
-        for device in self.storage_suite:
-            self.storage_suite[device].modify(param[device])
+        gc.enable()
+        for device in param:
+            #self.storage_suite[device].modify(param[device])
+            del self.storage_suite[device]
+            try:
+                self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap=param[device]['cap'], power=param[device]['power'])
+            except KeyError:
+                self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap=param[device]['cap'])
+
+        gc.collect()
+        gc.disable()
+
+    def user_modify_storage(self, device, cap):
+        self.storage_suite[device].modify({'cap':cap})
 
     def print_variables(self):
         for device in self.storage_suite:
@@ -66,15 +80,14 @@ class StorageSuite:
         device.soc_cap -= amount_to_discharge
         device.soc = device.soc_cap / device.cap
         if amount_wanted > power:
-            self.peak_time -= 1
-        elif self.peak_time != self.INIT_PEAK_TIME:
-            self.peak_time += 1
+            device.peak_time -= 1
+        elif device.peak_time != device.INIT_PEAK_TIME:
+            device.peak_time += 1
+        #should consider making some of this stuff part of Storage - I accidentally started using self instead of device, after all
 
         econ_cost.cost += device.MARGINAL_COST * amount_wanted
 
         return amount_wanted
-
-        #need to implement mechanism for tracking peak discharge usage
 
     def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None):
         device = self.storage_suite[stor_type]
@@ -121,18 +134,22 @@ class StorageSuite:
 
 
 class Storage:
-    def __init__(self, data: dict, type: str):
+    def __init__(self, data: dict, type: str, cap=100, power=10):
         
         
         #fixed
         self.DATA = data
         self.TYPE = type
-        self.cap = None # in kWh
-        self.power = None # in kW
+        self.cap = cap # in kWh
+        self.power = power # in kW #whoa whoa whoa what about flow batteries huh
+        """
         if self.power == None:
-            self.power = self.cap * eval_expr(self.data['max_cont_discharge']) # uses default power to capacity ratio for given type
-        self.START_WINDOW = self.data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
-        self.END_WINDOW = self.data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
+            self.power = self.cap * eval_expr(data['max_cont_discharge'].replace("x", str(self.cap))) # uses default power to capacity ratio for given type
+        """
+        """
+        self.START_WINDOW = data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
+        self.END_WINDOW = data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
+        """
     
         self.MAX_SOC = data['max_charge'] # maximum charge as a proportion of capacity
         self.MIN_SOC = data['min_charge'] # minimum charge as a proportion of capacity
@@ -163,8 +180,8 @@ class Storage:
         def capital_cost(self): # independent capacity and power capital cost formula
             return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap)).replace("y", str(self.power)).replace("'", ""))
 
-        self.capital_cost = self.capital_cost()
-        self.peak_discharge = self.peak_discharge()
+        self.capital_cost = capital_cost(self)
+        self.peak_discharge = peak_discharge(self)
 
         self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kWh in/out, in USD
         #self.ramp_speed = ss.device_data['ramp_speed']
@@ -196,17 +213,18 @@ class Storage:
         else:
             self.soc -= delta_soc
             self.soc_cap = self.max_soc_cap * self.soc    
-    
+    """
     def modify(self, param: dict):
         self.cap = param['cap']
         if 'power' in param:
             self.power = param['power']
         else:
-            self.power = self.cap * eval_expr(self.data['max_cont_discharge'])
-        self.peak_discharge = eval_expr(data['max_peak_discharge'].replace("x", str(self.power))) * self.power
-        self.max_soc_cap = self.data['max_charge'] * self.cap
-        self.min_soc_cap = self.data['min_charge'] * self.cap
-        self.capital_cost = self.capital_cost()
+            self.power = self.cap * eval_expr(self.DATA['max_cont_discharge'].replace("x", str(self.cap)))
+        self.peak_discharge = eval_expr(self.DATA['max_peak_discharge'].replace("x", str(self.power))) * self.power
+        self.max_soc_cap = self.DATA['max_charge'] * self.cap
+        self.min_soc_cap = self.DATA['min_charge'] * self.cap
+        self.capital_cost = capital_cost()
+    """
 
     def print_properties(self):
         print("**************************\n")
@@ -223,15 +241,51 @@ class Storage:
 
 if __name__ == "__main__":
     test_ss = StorageSuite('data/energy_storage_devices_v5.csv')
-    print(test_ss.storage_suite['li-ion'].self_discharge())
-    print(test_ss.storage_suite['li-ion'].CAPITAL_COST)
-    print(test_ss.storage_suite['li-ion'].eff_charge())
-    print(test_ss.storage_suite['li-ion'].eff_discharge())
-    print(test_ss.storage_suite['li-ion'].current_charge())
+    #test_ss.user_modify_storage('li-ion', 1000)
+    #print(test_ss.storage_suite['li-ion'].self_discharge())
+    #print(test_ss.storage_suite['li-ion'].CAPITAL_COST)
+    #print(test_ss.storage_suite['li-ion'])
+    obj_id = id(test_ss.storage_suite['li-ion'])
+    print(ctypes.cast(obj_id, ctypes.py_object).value)
+    print(test_ss.storage_suite['li-ion'].cap)
+    
+    # print(test_ss.storage_suite['li-ion'].eff_charge())
+    # print(test_ss.storage_suite['li-ion'].eff_discharge())
+    # print(test_ss.storage_suite['li-ion'].current_charge())
+    test_ss.modify_ss({'li-ion':{'cap':2000}})
+    #print(test_ss.storage_suite['li-ion'])
+    print(ctypes.cast(obj_id, ctypes.py_object).value)
+    print(test_ss.storage_suite['li-ion'].cap)
+
+    #print(0x0000024ABF413DC0)
+    #print(test_ss.storage_suite['li-ion'])
+
 
     #print(test_ss.device_data)
     #print(test_ss.storage_suite['flywheel'].CAPITAL_COST)
     #print(test_ss.device_data['flywheel']['capital_cost'])
+
+    #import ctypes
+    # import ctypes
+    
+    # # variable declaration
+    # val = 20
+    
+    # # display variable
+    # print("Actual value -", val)
+    
+    # # get the memory address of the python object 
+    # # for variable
+    # x = id(val)
+    
+    # # display memory address
+    # print("Memory address - ", x)
+    
+    # # get the value through memory address
+    # a = ctypes.cast(x, ctypes.py_object).value
+    
+    # # display
+    # print("Value - ", a)
 
 
 
