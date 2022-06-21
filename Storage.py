@@ -8,7 +8,8 @@ from unittest.mock import NonCallableMagicMock
 import gc
 import ctypes
 
-# supported operators
+##################################################
+# the following is a string -> evaluation parser #
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
              ast.USub: op.neg}
@@ -29,19 +30,23 @@ def eval_(node):
     else:
         raise TypeError(node)
 
+###################################################
+
+
+# StorageSuite aggregates all Storage objects so that they can be interacted in a straightforward manner
 class StorageSuite:
     def __init__(self, filename):
-        self.device_data = {}
-        self.storage_suite = {}
+        self.device_data = {} # the string data from the CSV file
+        self.storage_suite = {} # where the Storage objects are stored (str(name) -> Storage)
         self.tracking_timestep = 0
-        with open(filename, newline='', encoding='utf-8-sig') as devices_file:
+        with open(filename, newline='', encoding='utf-8-sig') as devices_file: # opens storage data file
             reader = csv.DictReader(devices_file)
             for row in reader:
                 self.device_data[row['type']] = row
         for device in self.device_data:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device)
 
-    def modify_ss(self, param: dict):
+    def modify_ss(self, param: dict): # takes in a dict containing new power and capacity values, re-initializes all Storage objects
         #print(gc.isenabled())
         for device in param:
             #self.storage_suite[device].modify(param[device])
@@ -53,36 +58,43 @@ class StorageSuite:
 
         gc.collect()
 
-    def user_modify_storage(self, device, cap):
+    def get_capital_cost(self):
+        capital_cost = 0
+        for device in self.storage_suite:
+            capital_cost += self.storage_suite[device].capital_cost
+
+        return capital_cost
+
+    def user_modify_storage(self, device, cap): # a manual way of doing the above
         self.storage_suite[device].modify({'cap':cap})
 
-    def print_variables(self):
+    def print_variables(self): # prints variables of each Storage object
         for device in self.storage_suite:
             self.storage_suite[device].print_variables()
 
-    def print_properties(self):
+    def print_properties(self): # prints invariables of each Storage object
         for device in self.storage_suite:
             self.storage_suite[device].print_properties()
 
-    def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None):
+    def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None): # attempts to discharge a given device based on the usable amount wanted or the amount to remove from the device
         device = self.storage_suite[stor_type]
         device.discharge(econ_cost, amount_wanted, amount_to_discharge)
         return amount_wanted
 
-    def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None):
+    def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None): # attempts to charge a given device based on the usable amount wanted or the amount to supply to the device
         device = self.storage_suite[stor_type]
         device.charge(econ_cost, amount_to_supply, amount_to_charge)
         return amount_to_supply
 
 
-    def self_discharge_all(self):
+    def self_discharge_all(self): # self-discharges all devices
         for device in self.storage_suite:
             self.storage_suite[device].self_discharge()
 
     def get_status_variables(self): # values that change within one microgrid
         variables = {}
         for device in self.storage_suite:
-            device.get_state(variables)
+            self.storage_suite[device].get_state(variables)
 
         return variables
 
@@ -91,10 +103,9 @@ class StorageSuite:
     def get_properties(self): # values that stay the same within one microgrid
         properties = {}
         for device in self.storage_suite:
-            device.get_properties()
+            self.storage_suite[device].get_properties(properties)
 
         return properties
-
 
 
 
@@ -123,14 +134,14 @@ class StorageSuite:
 
 
 class Storage:
-    def __init__(self, data: dict, type: str, cap=100, power=10):
+    def __init__(self, data: dict, type: str, cap=100, power=10): # 100 and 10 placeholder for testing
         
         
         #fixed
-        self.DATA = data
-        self.TYPE = type
-        self.cap = cap # in kWh
-        self.power = power # in kW #whoa whoa whoa what about flow batteries huh
+        self.DATA = data # CSV data dictionary
+        self.TYPE = type # string representing the type of device
+        self.cap = cap # capacity, in kWh
+        self.power = power # power
         """
         if self.power == None:
             self.power = self.cap * eval_expr(data['max_cont_discharge'].replace("x", str(self.cap))) # uses default power to capacity ratio for given type
