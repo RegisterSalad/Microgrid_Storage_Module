@@ -9,7 +9,7 @@ import gc
 import ctypes
 
 ##################################################
-# the following is a string -> evaluation parser #
+''' the following is a string -> evaluation parser '''
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
              ast.USub: op.neg}
@@ -33,8 +33,28 @@ def eval_(node):
 ###################################################
 
 
-# StorageSuite aggregates all Storage objects so that they can be interacted in a straightforward manner
 class StorageSuite:
+    ''' StorageSuite aggregates all Storage objects so that they can be interacted in a straightforward manner
+        Each microgrid contains 3 storage objects:
+            - Litium Ion Storage (includes vehicle to grid)
+            - Vanadium Flow Storage
+            - Flywheel Energy Storage
+        Each storage object contains the values:
+            - type
+            - cap
+            - max_cont_power
+            - max_soc
+            - min_soc
+            - max_energy
+            - min_energy
+            - max_peak_power
+            - capital_cost
+            - marginal_cost
+            - resp_time
+            - max_peak_time 
+    '''
+            
+        
     def __init__(self, filename):
         self.device_data = {} # the string data from the CSV file
         self.storage_suite = {} # where the Storage objects are stored (str(name) -> Storage)
@@ -46,7 +66,8 @@ class StorageSuite:
         for device in self.device_data:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device)
 
-    def modify_ss(self, param: dict): # takes in a dict containing new power and capacity values, re-initializes all Storage objects
+    def modify_ss(self, param: dict): # 
+        ''' Takes in a dict containing new power and capacity values, re-initializes all Storage objects '''
         #print(gc.isenabled())
         for device in param:
             #self.storage_suite[device].modify(param[device])
@@ -59,39 +80,45 @@ class StorageSuite:
         gc.collect()
 
     def get_capital_cost(self):
-        capital_cost = 0
+        ''' Returns the total capital cost of all storage devices based on capacity'''
+        capital_cost : int = 0
         for device in self.storage_suite:
             capital_cost += self.storage_suite[device].capital_cost
 
         return capital_cost
 
-    def user_modify_storage(self, device, cap): # a manual way of doing the above
-        self.storage_suite[device].modify({'cap':cap})
+    def user_modify_storage(self, device, cap) -> None: # 
+        ''' Manual way of modifying the ratios of a single storage object '''
+        self.storage_suite[device].modify({'cap':cap}) 
 
-    def print_variables(self): # prints variables of each Storage object
+    def print_variables(self) -> None: # prints variables of each Storage object
         for device in self.storage_suite:
             self.storage_suite[device].print_variables()
 
-    def print_properties(self): # prints invariables of each Storage object
+    def print_properties(self) -> None: # prints invariables of each Storage object
         for device in self.storage_suite:
             self.storage_suite[device].print_properties()
 
-    def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None): # attempts to discharge a given device based on the usable amount wanted or the amount to remove from the device
+    def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None):
+        ''' attempts to discharge a given device based on the usable amount wanted or the amount to remove from the device '''
         device = self.storage_suite[stor_type]
         device.discharge(econ_cost, amount_wanted, amount_to_discharge)
         return amount_wanted
 
-    def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None): # attempts to charge a given device based on the usable amount wanted or the amount to supply to the device
+    def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None):
+        ''' attempts to charge a given device based on the usable amount wanted or the amount to supply to the device '''
         device = self.storage_suite[stor_type]
         device.charge(econ_cost, amount_to_supply, amount_to_charge)
         return amount_to_supply
 
 
-    def self_discharge_all(self): # self-discharges all devices
+    def self_discharge_all(self) -> None:
+        ''' self-discharges all devices '''
         for device in self.storage_suite:
             self.storage_suite[device].self_discharge()
 
-    def get_status_variables(self): # values that change within one microgrid
+    def get_status_variables(self) -> dict:
+        ''' Returns values that change within one microgrid ''' 
         variables = {}
         for device in self.storage_suite:
             self.storage_suite[device].get_state(variables)
@@ -100,7 +127,8 @@ class StorageSuite:
 
 
 
-    def get_properties(self): # values that stay the same within one microgrid
+    def get_properties(self):
+        ''' Returns values that stay the same within one microgrid ''' 
         properties = {}
         for device in self.storage_suite:
             self.storage_suite[device].get_properties(properties)
