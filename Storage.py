@@ -1,5 +1,6 @@
 import csv
-import ast #Library for parsing formula syntax
+import ast
+from logging import captureWarnings #Library for parsing formula syntax
 import operator as op
 from math import e
 import re
@@ -32,6 +33,7 @@ class StorageSuite:
     def __init__(self, filename):
         self.device_data = {}
         self.storage_suite = {}
+        self.tracking_timestep = 0
         with open(filename, newline='', encoding='utf-8-sig') as devices_file:
             reader = csv.DictReader(devices_file)
             for row in reader:
@@ -40,7 +42,7 @@ class StorageSuite:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device)
 
     def modify_ss(self, param: dict):
-        gc.enable()
+        #print(gc.isenabled())
         for device in param:
             #self.storage_suite[device].modify(param[device])
             del self.storage_suite[device]
@@ -50,7 +52,6 @@ class StorageSuite:
                 self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap=param[device]['cap'])
 
         gc.collect()
-        gc.disable()
 
     def user_modify_storage(self, device, cap):
         self.storage_suite[device].modify({'cap':cap})
@@ -65,52 +66,40 @@ class StorageSuite:
 
     def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None):
         device = self.storage_suite[stor_type]
-        power = device.power
-        if amount_wanted == None:
-            amount_wanted = device.eff_discharge() * amount_to_discharge
-        elif amount_to_discharge == None:
-            amount_to_discharge = amount_wanted / device.eff_discharge()
-        if (amount_wanted * 3600) > power:
-            if (amount_wanted * 3600) < device.peak_discharge and device.peak_time == 0:
-                raise ValueError("Peak time exhausted: Tried to get " + stor_type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum available this second is continuous power at " + str(power/3600) + "kWh at " + str(power) + "kW.")
-            if (amount_wanted * 3600) > device.peak_discharge:
-                raise ValueError("Tried to get " + stor_type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum peak available in a second is " + str(power/3600) + "kWh at " + str(power) + "kW.")
-        if (device.soc_cap - amount_to_discharge) < device.min_soc_cap:
-            raise ValueError("Tried to discharge " + stor_type + str(amount_to_discharge) + "kWh when there was only " + str(device.soc_cap - device.min_soc_cap) + "kWh left.")
-        device.soc_cap -= amount_to_discharge
-        device.soc = device.soc_cap / device.cap
-        if amount_wanted > power:
-            device.peak_time -= 1
-        elif device.peak_time != device.INIT_PEAK_TIME:
-            device.peak_time += 1
-        #should consider making some of this stuff part of Storage - I accidentally started using self instead of device, after all
-
-        econ_cost.cost += device.MARGINAL_COST * amount_wanted
-
+        device.discharge(econ_cost, amount_wanted, amount_to_discharge)
         return amount_wanted
 
     def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None):
         device = self.storage_suite[stor_type]
-        power = device.power
-        if amount_to_charge == None:
-            amount_to_charge = device.eff_charge() * amount_to_supply
-        elif amount_to_supply == None:
-            amount_to_supply = amount_to_charge / device.eff_charge()
-        if (amount_to_charge * 3600) > power:
-            raise ValueError("Tried to charge " + stor_type + str(amount_to_charge) + "kWh at " + str(amount_to_charge*3600) + "kW when the maximum able to be charged in a second is " + str(power/3600) + "kWh at " + str(power) + "kW.")
-        if (device.soc_cap + amount_to_charge) > device.max_soc_cap:
-            raise ValueError("Tried to charge " + stor_type + str(amount_to_charge) + "kWh when there was only " + str(device.soc_cap - device.min_soc_cap) + "kWh of capacity left.")
-        device.soc_cap += amount_to_charge
-        device.soc = device.soc_cap / device.cap
-
-        econ_cost.cost += device.MARGINAL_COST * amount_to_supply
-
+        device.charge(econ_cost, amount_to_supply, amount_to_charge)
         return amount_to_supply
 
 
     def self_discharge_all(self):
         for device in self.storage_suite:
             self.storage_suite[device].self_discharge()
+
+    def get_status_variables(self): # values that change within one microgrid
+        variables = {}
+        for device in self.storage_suite:
+            device.get_state(variables)
+
+        return variables
+
+
+
+    def get_properties(self): # values that stay the same within one microgrid
+        properties = {}
+        for device in self.storage_suite:
+            device.get_properties()
+
+        return properties
+
+
+
+
+
+
 
 
 # StorageSuite
@@ -232,11 +221,74 @@ class Storage:
         for prop in self.DATA:
             print(prop + ": " + self.DATA[prop] + "\n")
 
+    def get_properties(self, properties:dict):
+        properties[self.TYPE]['type'] = self.TYPE
+        properties[self.TYPE]['cap'] = self.cap
+        properties[self.TYPE]['max_cont_power'] = self.power
+        properties[self.TYPE]['max_soc'] = self.MAX_SOC
+        properties[self.TYPE]['min_soc'] = self.MIN_SOC
+        properties[self.TYPE]['max_energy'] = self.max_soc_cap
+        properties[self.TYPE]['min_energy'] = self.min_soc_cap
+        properties[self.TYPE]['max_peak_power'] = self.peak_discharge
+        properties[self.TYPE]['capital_cost'] = self.capital_cost
+        properties[self.TYPE]['marginal_cost'] = self.MARGINAL_COST
+        properties[self.TYPE]['resp_time'] = self.resp_time
+        properties[self.TYPE]['max_peak_time'] = self.INIT_PEAK_TIME
+
     def print_variables(self):
         print("**************************\n")
         print("Device: " + self.TYPE + "\n")
         print("Capacity: " + self.cap + "kWh\n")
         print("Power: " + self.power + "kW\n")
+
+    def get_state(self, variables:dict):
+        variables[self.TYPE]['soc'] = self.soc
+        variables[self.TYPE]['stored_energy'] = self.current_charge()
+        variables[self.TYPE]['eff_charge'] = self.eff_charge()
+        variables[self.TYPE]['eff_discharge'] = self.eff_discharge()
+        variables[self.TYPE]['self_discharge'] = self.get_self_discharge_rate()
+        variables[self.TYPE]['peak_time_left'] = self.peak_time()
+
+    def charge(self, econ_cost, amount_to_supply=None, amount_to_charge=None):
+        if amount_to_charge == None:
+            amount_to_charge = self.eff_charge() * amount_to_supply
+        elif amount_to_supply == None:
+            amount_to_supply = amount_to_charge / self.eff_charge()
+        if (amount_to_charge * 3600) > self.power:
+            raise ValueError("Tried to charge " + self.type + str(amount_to_charge) + "kWh at " + str(amount_to_charge*3600) + "kW when the maximum able to be charged in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+        if (self.soc_cap + amount_to_charge) > self.max_soc_cap:
+            raise ValueError("Tried to charge " + self.type + str(amount_to_charge) + "kWh when there was only " + str(self.soc_cap - self.min_soc_cap) + "kWh of capacity left.")
+        self.soc_cap += amount_to_charge
+        self.soc = self.soc_cap / self.cap
+
+        econ_cost.cost += self.MARGINAL_COST * amount_to_supply
+
+        return amount_to_supply
+
+    def discharge(self, econ_cost, amount_wanted=None, amount_to_discharge=None):
+        if amount_wanted == None:
+            amount_wanted = self.eff_discharge() * amount_to_discharge
+        elif amount_to_discharge == None:
+            amount_to_discharge = amount_wanted / self.eff_discharge()
+        if (amount_wanted * 3600) > self:
+            if (amount_wanted * 3600) < self.peak_discharge and self.peak_time == 0:
+                raise ValueError("Peak time exhausted: Tried to get " + self.type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum available this second is continuous power at " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+            if (amount_wanted * 3600) > self.peak_discharge:
+                raise ValueError("Tried to get " + self.type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum peak available in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+        if (self.soc_cap - amount_to_discharge) < self.min_soc_cap:
+            raise ValueError("Tried to discharge " + self.type + str(amount_to_discharge) + "kWh when there was only " + str(self.soc_cap - self.min_soc_cap) + "kWh left.")
+        self.soc_cap -= amount_to_discharge
+        self.soc = self.soc_cap / self.cap
+        if amount_wanted > self.power:
+            self.peak_time -= 1
+        elif self.peak_time != self.INIT_PEAK_TIME:
+            self.peak_time += 1
+        #should consider making some of this stuff part of Storage - I accidentally started using self instead of device, after all
+
+        econ_cost.cost += self.MARGINAL_COST * amount_wanted
+
+        return amount_wanted
+
         
 
 if __name__ == "__main__":
@@ -253,7 +305,7 @@ if __name__ == "__main__":
     # print(test_ss.storage_suite['li-ion'].eff_discharge())
     # print(test_ss.storage_suite['li-ion'].current_charge())
     test_ss.modify_ss({'li-ion':{'cap':2000}})
-    #print(test_ss.storage_suite['li-ion'])
+    print(test_ss.storage_suite['li-ion'])
     print(ctypes.cast(obj_id, ctypes.py_object).value)
     print(test_ss.storage_suite['li-ion'].cap)
 
@@ -265,27 +317,6 @@ if __name__ == "__main__":
     #print(test_ss.storage_suite['flywheel'].CAPITAL_COST)
     #print(test_ss.device_data['flywheel']['capital_cost'])
 
-    #import ctypes
-    # import ctypes
-    
-    # # variable declaration
-    # val = 20
-    
-    # # display variable
-    # print("Actual value -", val)
-    
-    # # get the memory address of the python object 
-    # # for variable
-    # x = id(val)
-    
-    # # display memory address
-    # print("Memory address - ", x)
-    
-    # # get the value through memory address
-    # a = ctypes.cast(x, ctypes.py_object).value
-    
-    # # display
-    # print("Value - ", a)
 
 
 
