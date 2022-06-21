@@ -30,6 +30,6 @@ Storage:
     This class is used to apply the correct behavior to the appropriate storage types 
     
 StorageSuite:
-    This class is used to manage data flow to and from the module
+    This class is used to aggregate all storage objects and opperates on them, and to manage data flow to and from the module
     
 
