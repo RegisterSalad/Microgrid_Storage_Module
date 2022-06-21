@@ -14,3 +14,22 @@
 
 {    Base algo Script is up, I stated on the microgrid class 
      The comments there should explain everything    } 5/26/2022
+
+Storage Module Functionality:
+
+Stores and checks contraints on the values of microgrid-scale storage devices:
+    - Lithium Ion Cell Batteries
+    - Vanadium Ion Flow Batteries
+    - Flywheel Energy Storage
+
+Due to implimentaton on a second-timscale, the horizon limits within the simulator where changed to account for large data sizes.
+
+This module contains two classes: Storage, and StorageSuite, along with some functions from parsing strings into mathematical functions
+
+Storage:
+    This class is used to apply the correct behavior to the appropriate storage types 
+    
+StorageSuite:
+    This class is used to manage data flow to and from the module
+    
+
