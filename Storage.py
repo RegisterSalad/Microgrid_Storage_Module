@@ -8,7 +8,7 @@ from unittest.mock import NonCallableMagicMock
 import gc
 import ctypes
 import numpy as np
-
+from IPython import display
 ##################################################
 ''' the following is a string -> evaluation parser '''
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
@@ -54,8 +54,6 @@ class StorageSuite:
             - resp_time
             - max_peak_time 
     '''
-            
-        
     def __init__(self, filename,load):
         self.device_data = {} # the string data from the CSV file
         self.storage_suite = {} # where the Storage objects are stored (str(name) -> Storage)
@@ -67,11 +65,10 @@ class StorageSuite:
         # print(self.device_data)
         baseline_capacity_dict ={  'li-ion': round(0.25*load,2), 
                                     'flywheel': round(0.25*load,2),
-                                    'v2g': round(0.25*load,2),
+                                    # 'v2g': round(0.25*load,2),
                                     'flow': round(0.25*load,2) 
                                 }
-        print(baseline_capacity_dict['li-ion'])
-        for idx,device in enumerate(self.device_data):
+        for device in self.device_data:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap = float(baseline_capacity_dict[device]))
         print(self.storage_suite)
         
@@ -150,6 +147,15 @@ class StorageSuite:
             self.storage_suite[device].get_properties(properties)
         return properties
 
+    def get_total_capital_cost(self) -> float:
+        cost: float = 0
+        properties = self.get_properties()
+        for device in self.storage_suite:
+            cost = cost + properties[device]['capital_cost']
+        return cost
+
+
+
 
 
 
@@ -186,12 +192,10 @@ class Storage:
         self.power = power # power
         if self.power == 0:
             self.power = self.cap * eval_expr(str(data['max_cont_discharge'].replace("x", str(self.cap)))) # uses default power to capacity ratio for given type
-        
         """
         self.START_WINDOW = data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
         self.END_WINDOW = data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
         """
-    
         self.MAX_SOC = data['max_charge'] # maximum charge as a proportion of capacity
         self.MIN_SOC = data['min_charge'] # minimum charge as a proportion of capacity
         self.max_energy = self.cap # * data['max_charge']  #maximum charge in kWh
@@ -216,12 +220,11 @@ class Storage:
             return eval_expr(self.FORMULA_PEAK_DISCHARGE.replace("self.cap", str(self.cap)).replace("self.power", str(self.power))) # assumed 10s peak capability, in kW
         def capital_cost(self): # independent capacity and power capital cost formula
             return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap)).replace("y", str(self.power)).replace("'", ""))
-
         self.capital_cost = capital_cost(self)
         self.peak_discharge = peak_discharge(self)
-
+        
         self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kWh in/out, in USD
-        #self.ramp_speed = ss.device_data['ramp_speed']
+        # self.ramp_speed = ss.device_data['ramp_speed']
         self.resp_time = data['resp_time'] # time it takes for device to realize command, in seconds
         self.soc = 0.85 # state of charge as a proportion of capacity
         self.soc_cap = self.soc * self.cap # state of charge in kWh
@@ -237,8 +240,10 @@ class Storage:
         #return ast.literal_eval(parsed_expr)
     def eff_charge(self): # charge effiency function
         return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc)).replace("'", ""))
+
     def eff_discharge(self): # discharge effiency function
         return eval_expr(self.FORMULA_EFF_DISCHARGE.replace("self.soc", str(self.soc)))
+
     def current_charge(self):
         return self.soc * self.cap
     
@@ -332,9 +337,7 @@ class Storage:
         elif self.peak_time != self.INIT_PEAK_TIME:
             self.peak_time += 1
         #should consider making some of this stuff part of Storage - I accidentally started using self instead of device, after all
-
         econ_cost.cost += self.MARGINAL_COST * amount_wanted
-
         return amount_wanted
 
         
