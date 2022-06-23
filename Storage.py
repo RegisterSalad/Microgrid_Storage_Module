@@ -128,19 +128,21 @@ class StorageSuite:
 
     def get_status_variables(self) -> dict:
         ''' Returns values that change within one microgrid ''' 
-        variables = {}
+        variables = {  'li-ion': {}, 
+                        'flywheel': {},
+                        # 'v2g': {},
+                        'flow': {}
+                        }
         for device in self.storage_suite:
             self.storage_suite[device].get_state(variables)
 
         return variables
 
-
-
     def get_properties(self):
         ''' Returns values that stay the same within one microgrid ''' 
         properties = {  'li-ion': {}, 
                         'flywheel': {},
-                        'v2g': {},
+                        # 'v2g': {},
                         'flow': {}
                         }
         for device in self.storage_suite:
@@ -226,7 +228,7 @@ class Storage:
         self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kWh in/out, in USD
         # self.ramp_speed = ss.device_data['ramp_speed']
         self.resp_time = data['resp_time'] # time it takes for device to realize command, in seconds
-        self.soc = 0.85 # state of charge as a proportion of capacity
+        self.soc = 1 # state of charge as a proportion of capacity
         self.soc_cap = self.soc * self.cap # state of charge in kWh
         self.INIT_PEAK_TIME = data['peak_time']
         self.peak_time = self.INIT_PEAK_TIME #how many consecutive seconds the device can still peak for
@@ -300,7 +302,7 @@ class Storage:
         variables[self.TYPE]['eff_charge'] = self.eff_charge()
         variables[self.TYPE]['eff_discharge'] = self.eff_discharge()
         variables[self.TYPE]['self_discharge'] = self.get_self_discharge_rate()
-        variables[self.TYPE]['peak_time_left'] = self.peak_time()
+        variables[self.TYPE]['peak_time_left'] = self.peak_time
 
     def charge(self, econ_cost, amount_to_supply=None, amount_to_charge=None):
         if amount_to_charge == None:

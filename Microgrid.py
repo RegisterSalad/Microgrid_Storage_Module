@@ -11,9 +11,13 @@ Gonzague Henri
 """
 <pymgrid is a Python library to simulate microgrids>
 Copyright (C) <2020> <Total S.A.>
+
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
 You should have received a copy of the GNU Lesser General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """
 
 import pandas as pd
@@ -28,6 +32,7 @@ import cufflinks as cf
 from IPython.display import display
 from IPython import get_ipython
 from pymgrid.algos.Control import Benchmarks
+# from Storage import StorageSuite as ss
 
 def in_ipynb():
     try:
@@ -46,7 +51,7 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 24 #in hours
+DEFAULT_HORIZON = 31579200 #in hours
 DEFAULT_TIMESTEP = 1 #in hours
 ZERO = 10**-5
 
@@ -60,6 +65,7 @@ class Battery:
     """
     The class battery is used to store the information related to the battery in a microgrid. One of the main use for
     this class is for an easy access to information in a notebook using the battery object contained in a microgrid.
+
     Parameters
     ----------
     param_battery : dataframe
@@ -68,6 +74,7 @@ class Battery:
         Represents the amount of energy that a battery can charge before being full.
     capa_to_discharge : float
         Represents the amount of energy available that a battery can discharge before being empty.
+
     Attributes
     ----------
     soc: float
@@ -91,10 +98,13 @@ class Battery:
         Represents the amount of energy that a battery can charge before being full.
     capa_to_discharge : float
         Represents the amount of energy available that a battery can discharge before being empty.
+
+
     Notes
     -----
     Another way to use this information in a notebook is to use /tab/ after /microgrid.battery./ so you can see all the
     battery attributes.
+
     Examples
     --------
     >>> m_gen=mg.MicrogridGenerator(nb_microgrid=1,path='your_path')
@@ -124,10 +134,12 @@ class Genset:
     """
     The class Genset is used to store the information related to the genset in a microgrid. One of the main use for
     this class is for an easy access to information in a notebook using the genset object contained in a microgrid.
+
     Parameters
     ----------
     param : dataframe
         All the data to initialize the genset.
+
     Attributes
     ----------
     rated_power: int
@@ -138,10 +150,12 @@ class Genset:
         Value representing the maximum operating power of the genset (kW)
     fuel_cost: float
         Value representing the cost of using the genset in $/kWh.
+
     Notes
     -----
     Another way to use this information in a notebook is to use /tab/ after /microgrid.genset./ so you can see all the
     genset attributes.
+
     Examples
     --------
     >>> m_gen=mg.MicrogridGenerator(nb_microgrid=1,path='your_path')
@@ -163,12 +177,15 @@ class Grid:
     """
     The class Grid is used to store the information related to the grid in a microgrid. One of the main use for
     this class is for an easy access to information in a notebook using the grid object contained in a microgrid.
+
     Parameters
     ----------
     param : dataframe
         All the data to initialize the grid.
     status: int
         Whether the grid is connected or not at the first time step.
+
+
     Attributes
     ----------
     power_export: float
@@ -176,16 +193,18 @@ class Grid:
     power_import: float
         Value representing the maximum import power from the grid (kW)
     price_export: float
-        Value representing the cost of exporting to the grid in $/kWh.
+        Value representing the cost of exporting to the grid in $/kJ.
     price_import: float
-        Value representing the cost of importing to the grid in $/kWh.
+        Value representing the cost of importing to the grid in $/kJ.
     status: int, binary
         Binary value representing whether the grid is connected or not (for example 0 represent a black-out of the
         main grid).
+
     Notes
     -----
     Another way to use this information in a notebook is to use /tab/ after /microgrid.grid./ so you can see all the
     grid attributes.
+
     Examples
     --------
     >>> m_gen=mg.MicrogridGenerator(nb_microgrid=1,path='your_path')
@@ -208,6 +227,7 @@ class Microgrid:
 
     """
     The class microgrid implement a microgrid. It is also used to run the simulation and different benchmarks.
+
     Parameters
     ----------
     parameters : dataframe
@@ -231,6 +251,7 @@ class Microgrid:
          values (in hour).
     timestep : int, optional
         Time step the microgrid is operating at (in hour).
+
     Attributes
     ----------
         parameters: dataframe
@@ -294,24 +315,29 @@ class Microgrid:
             value at _run_timestep).
         benchmarks: algos.Control.Benchmarks
             Benchmark object with the ability to run benchmark algorithms and store/print the results.
+
     Notes
     -----
     We are trying to keep hidden a lot of what is happening under the hood to simplify using this class for control or
     RL research at the maximum. A few notes, in this class parameters refer to the fixed parameters of the microgrid,
     meaning they don't vary with time. The varying parameters can be found in either the other classes or
     _df_record_state.
+
     Examples
     --------
     To create microgrids through MicrogridGenerator:
     >>> m_gen=mg.MicrogridGenerator(nb_microgrid=1,path='your_path')
     >>> m_gen.generate_microgrid()
     >>>microgrid = m_gen.microgrid[0]
+
     To plot informations about the microgrid:
     >>> microgrid.print_info()
     >>> microgrid.print_control_info()
+
     To compute the benchmarks:
     >>> microgrid.compute_benchmark() # to compute them all
     >>> microgrid.compute_benchmark('mpc_linprog') #to compute only the MPC
+
     For example, a simple control loop:
     >>> while m_gen.microgrids[0].done == False:
     >>>     load = mg_data['load']
@@ -458,6 +484,10 @@ class Microgrid:
         """ Function that returns the cost associated the operation of the last time step. """
         return self._df_record_cost['total_cost'][-1]
 
+    def get_current_cost(self):
+        """ Function that returns the cost associated the operation of the last time step. """
+        return self._df_record_cost['total_cost'][0]
+
     def get_co2(self):
         """ Function that returns the co2 emissions associated to the operation of the last time step. """
         return self._df_record_co2['co2'][-1]
@@ -589,19 +619,23 @@ class Microgrid:
     def run(self, control_dict):
         """
         Function to 'run' the microgrid and iterate over the dataset.
+
         Parameters
         ----------
         control_dict : dictionnary
             Dictionnary containing the different control actions we want to apply to the microgrid. Its fields depend
             on the architecture of the microgrid
+
         Return
         ----------
         self.get_updated_values(): dictionnary
             Return all the parameters that change with time in the microgrid. CF this function for more details.
+
         Notes
         ----------
         This loop is the main connexion with a user in a notebook. That is where the simulation is ran and where the
         control actions are recorder and applied.
+
         """
 
         control_dict['load'] = self.load
@@ -649,6 +683,7 @@ class Microgrid:
     def train_test_split(self, train_size=0.67, shuffle = False, cancel=False):
         """
         Function to split our data between a training and testing set.
+
         Parameters
         ----------
         train_size : float, optional
@@ -658,6 +693,7 @@ class Microgrid:
             Not implemented yet for shuffle = True
         cancel: boolean
             Variable indicating if the split needs to be reverted, and the data brought back into one dataset
+
         Attributes
         ----------
         _limit_index : int
@@ -682,6 +718,7 @@ class Microgrid:
             Timeseries of price_export in training set
         grid_price_export_test: dataframe
             Timeseries of price_export in testing set
+
         """
 
         if self._has_train_test_split ==  False:
@@ -917,9 +954,6 @@ class Microgrid:
 
         if p_import > self._zero and p_export > self._zero:
             pass
-            #print ('cannot import and export at the same time')
-            #todo how to deal with that?
-
         if p_import > self.parameters['grid_power_import'].values[0]:
             p_import = self.parameters['grid_power_import'].values[0]
 
@@ -966,6 +1000,7 @@ class Microgrid:
         This function records the actual production occuring in the microgrid. Based on the control actions and the
         parameters of the microgrid. This function will check that the control actions respect the constraints of
         the microgrid and then record what generators have produced energy.
+
         Parameters
         ----------
         control_dict : dictionnary
@@ -974,6 +1009,7 @@ class Microgrid:
             Previous version of the record_production dataframe (coming from the run loop, or benchmarks).
         status: dataframe
             One line dataframe representing the changing parameters of the microgrid.
+
         Notes
         -----
         The mechanism to incure a penalty in case of over-generation is not yet in its final version.
