@@ -32,6 +32,8 @@ import cufflinks as cf
 from IPython.display import display
 from IPython import get_ipython
 from pymgrid.algos.Control import Benchmarks
+
+from Storage import StorageSuite
 # from Storage import StorageSuite as ss
 
 def in_ipynb():
@@ -51,82 +53,14 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 31579200 #in hours
-DEFAULT_TIMESTEP = 1 #in hours
+DEFAULT_HORIZON = 31579200 #in seconds
+DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
 '''
 The following classes are used to contain the information related to the different components
 of the microgrid. Their main use is for easy access in a notebook.
 '''
-
-class Battery:
-
-    """
-    The class battery is used to store the information related to the battery in a microgrid. One of the main use for
-    this class is for an easy access to information in a notebook using the battery object contained in a microgrid.
-
-    Parameters
-    ----------
-    param_battery : dataframe
-        All the data to initialize the battery.
-    capa_to_charge : float
-        Represents the amount of energy that a battery can charge before being full.
-    capa_to_discharge : float
-        Represents the amount of energy available that a battery can discharge before being empty.
-
-    Attributes
-    ----------
-    soc: float
-        Value between 0 and 1 representing the state of charge of the battery (1 being full, 0 being empty)
-    capacity: int
-        Total energy capacity of the battery (kWh).
-    soc_max: float
-        Value representing the maximum SOC that a battery can reach
-    soc_min: float
-        Value representing the minimum SOC that a battery can reach
-    p_charge_max: float
-        Value representing the maximum charging rate of the battery (kW)
-    p_discharge_max: float
-        Value representing the maximum discharging rate of the battery (kW)
-    efficiency: float
-        Value between 0 and 1 representing a one-way efficiency of the battery (considering same efficiency for charging
-        and discharging).
-    cost_cycle: float
-        Value representing the cost of using the battery in $/kWh.
-    capa_to_charge : float
-        Represents the amount of energy that a battery can charge before being full.
-    capa_to_discharge : float
-        Represents the amount of energy available that a battery can discharge before being empty.
-
-
-    Notes
-    -----
-    Another way to use this information in a notebook is to use /tab/ after /microgrid.battery./ so you can see all the
-    battery attributes.
-
-    Examples
-    --------
-    >>> m_gen=mg.MicrogridGenerator(nb_microgrid=1,path='your_path')
-    >>> m_gen.generate_microgrid()
-    >>> m_gen.microgrids[0].battery
-    You can then add a point and use tab to have suggestion of the different paramterers
-    You can access state of charge for example with:
-    >>> m_gen.microgrids[0].battery.soc
-    """
-
-    def __init__(self, param_battery, capa_to_charge, capa_to_discharge):
-
-        self.soc = param_battery['battery_soc_0'].values[0]
-        self.capacity = param_battery['battery_capacity'].values[0]
-        self.soc_max = param_battery['battery_soc_max'].values[0]
-        self.soc_min = param_battery['battery_soc_min'].values[0]
-        self.p_charge_max = param_battery['battery_power_charge'].values[0]
-        self.p_discharge_max = param_battery['battery_power_discharge'].values[0]
-        self.efficiency = param_battery['battery_efficiency'].values[0]
-        self.cost_cycle = param_battery['battery_cost_cycle'].values[0]
-        self.capa_to_charge = capa_to_charge
-        self.capa_to_discharge = capa_to_discharge
 
 
 
@@ -225,139 +159,16 @@ class Grid:
 
 class Microgrid:
 
-    """
-    The class microgrid implement a microgrid. It is also used to run the simulation and different benchmarks.
-
-    Parameters
-    ----------
-    parameters : dataframe
-        In parameters we find:
-            -'parameters': a dataframe containing all the fixed (not changing with time ) parameters of the microgrid
-            -'architecture': a dictionnary containing a binary variable for each possible generator and indicating if
-             this microgrid has one of them
-            -'load': the load time series
-            -'pv': the pv time series
-            -'grid_ts': a time series of 1 and 0 indicating whether the grid is available
-            -'df_actions': an empty dataframe representing the actions that the microgrid can take
-            -'df_status': a dataframe representing the parameters of the microgrid that change with time, with the
-             information for the first time step
-            -'df_actual_generation': an empty dataframe that is used to store what actually happens in the microgrid
-             after control actions are taken
-            -'df_cost': dataframe to track the cost of operating the microgrid at each time step
-            -'control_dict': an example of the control dictionnary that needs to be passed in run to operate the
-             microgrid
-    horizon : int, optional
-        The horizon considered to control the microgrid, mainly used in the MPC function and to return the forecasting
-         values (in hour).
-    timestep : int, optional
-        Time step the microgrid is operating at (in hour).
-
-    Attributes
-    ----------
-        parameters: dataframe
-            A dataframe containing all the fixed (not changing with time ) parameters of the microgrid
-        architecture : dictionary
-            A dictionary containing a binary variable for each possible generator and indicating if
-            this microgrid has one of them
-        _load_ts: dataframe
-            The time series of load
-        _pv_ts: dataframe
-            Time series of PV generation
-        pv: float
-            The PV production at _run_timestep
-        load: float
-            The load consumption at _run_timestep
-        _next_pv: float
-            The PV production at _run_timestep +1
-        _next_load: float
-            The load consumption at _run_timestep + 1
-        _grid_status_ts: dataframe
-            A timeseries of binary values indicating whether the grid is connected or not.
-        _df_record_control_dict: dataframe
-            This dataframe is used to record the control actions taked at each time step.
-        _df_record_state : dataframe
-            This dataframe is used to record the variable parameters of the microgrid at each time step.
-        _df_record_actual_production : dataframe
-            This dataframe is used to record the actual generation of the microgrid at each time step.
-        _df_record_cost : dataframe
-            This dataframe is used to record the cost of operating the microgrid at each time step.
-        _df_cost_per_epochs  : dataframe
-            In the case we run the simulation through multiple epochs, this dataframe is used to record the cost of
-             operating the microgrid at each time step of each epoch.
-        horizon : int, optional
-            The horizon considered to control the microgrid, mainly used in the MPC function and to return the forecasting
-             values (in hour).
-        _run_timestep : int
-            Time step the microgrid is operating at (in hour).
-        _data_length: int
-            Represents the number of time steps in PV/Load files (minimum between the 2) that will be used to run the
-            simulation.
-        done: True or False
-            Indicates whether a simulation is done or not
-        _has_run_rule_based_baseline: True or False
-            Indicates whether the rule based benchmark has already been run or not.
-        _has_run_mpc_baseline: True or False
-            Indicates whether the MPC benchmark has already been run or not.
-        _epoch: int
-            Tracks what epoch the microgrid is at
-        _zero: float
-            Approximate value to 0, used in some comparisons
-        control_dict: dictionnary
-            Represents the list of control actions to pass in the run function
-        battery: object
-            Represents all the parameter of the battery, including the value changing with time (in this case it is the
-            value at _run_timestep).
-        genset: object
-            Represents all the parameter of the genset, including the value changing with time (in this case it is the
-            value at _run_timestep).
-        grid: object
-            Represents all the parameter of the grid, including the value changing with time (in this case it is the
-            value at _run_timestep).
-        benchmarks: algos.Control.Benchmarks
-            Benchmark object with the ability to run benchmark algorithms and store/print the results.
-
-    Notes
-    -----
-    We are trying to keep hidden a lot of what is happening under the hood to simplify using this class for control or
-    RL research at the maximum. A few notes, in this class parameters refer to the fixed parameters of the microgrid,
-    meaning they don't vary with time. The varying parameters can be found in either the other classes or
-    _df_record_state.
-
-    Examples
-    --------
-    To create microgrids through MicrogridGenerator:
-    >>> m_gen=mg.MicrogridGenerator(nb_microgrid=1,path='your_path')
-    >>> m_gen.generate_microgrid()
-    >>>microgrid = m_gen.microgrid[0]
-
-    To plot informations about the microgrid:
-    >>> microgrid.print_info()
-    >>> microgrid.print_control_info()
-
-    To compute the benchmarks:
-    >>> microgrid.compute_benchmark() # to compute them all
-    >>> microgrid.compute_benchmark('mpc_linprog') #to compute only the MPC
-
-    For example, a simple control loop:
-    >>> while m_gen.microgrids[0].done == False:
-    >>>     load = mg_data['load']
-    >>>     pv = mg_data['pv']
-    >>>     control_dict = {'battery_charge': 0, 'battery_discharge': 0,'grid_import': max(0, load-pv),'grid_export':0,'pv': min(pv, load),}
-    >>>     mg_data = m_gen.microgrids[0].run(control_dict)
-    """
-
     def __init__(self, parameters, horizon=DEFAULT_HORIZON, timestep=DEFAULT_TIMESTEP):
         #list of parameters
         #this is a static dataframe: parameters of the microgrid that do not change with time
-
-        #self._param_check(parameters)
-
+        self._param_check(parameters)
         self.parameters = parameters['parameters']
         self.architecture = parameters['architecture']
+        self.size_load = parameters['load_size']
         #different timeseries
         self._load_ts=parameters['load']
         self._pv_ts=parameters['pv']
-
         self.pv = self._pv_ts.iloc[0,0]
         self.load = self._load_ts.iloc[0, 0]
         self._next_load = self._load_ts.iloc[1,0]
@@ -368,12 +179,10 @@ class Microgrid:
             self._grid_price_import=parameters['grid_price_import']
             self._grid_price_export=parameters['grid_price_export']
             self._grid_co2 = parameters['grid_co2']
-
             self._next_grid_status = self._grid_status_ts.iloc[0, 0]
             self._next_grid_price_export = self._grid_price_export.iloc[0, 0]
             self._next_grid_price_import = self._grid_price_import.iloc[0, 0]
             self._next_grid_co2 = self._grid_co2.iloc[0, 0]
-
         # those dataframe record what is happening at each time step
         self._df_record_control_dict=parameters['df_actions']
         self._df_record_state = parameters['df_status']
@@ -393,13 +202,9 @@ class Microgrid:
         self.control_dict = parameters['control_dict']
         self._data_set_to_use_default = 'all'
         self._data_set_to_use = 'all'
-
         self.benchmarks = Benchmarks(self)
-
-        if self.architecture['battery'] == 1:
-            self.battery = Battery(self.parameters,
-                                   self._df_record_state['capa_to_charge'][0],
-                                   self._df_record_state['capa_to_discharge'][0])
+        self.ss = parameters['storage_suite'] # Load Storage class objects
+        self.li_battery, self.flow_battery, self.flywheel, self.storage_params = self.ss.unpack() # unpack into usable format, same from MicrogridGenerator.py
         if self.architecture['genset'] == 1:
             self.genset = Genset(self.parameters)
         if self.architecture['grid'] == 1:
@@ -617,44 +422,20 @@ class Microgrid:
 
     #if return whole pv and load ts, the time can be counted in notebook
     def run(self, control_dict):
-        """
-        Function to 'run' the microgrid and iterate over the dataset.
-
-        Parameters
-        ----------
-        control_dict : dictionnary
-            Dictionnary containing the different control actions we want to apply to the microgrid. Its fields depend
-            on the architecture of the microgrid
-
-        Return
-        ----------
-        self.get_updated_values(): dictionnary
-            Return all the parameters that change with time in the microgrid. CF this function for more details.
-
-        Notes
-        ----------
-        This loop is the main connexion with a user in a notebook. That is where the simulation is ran and where the
-        control actions are recorder and applied.
-
-        """
-
         control_dict['load'] = self.load
         control_dict['pv'] = self.pv
 
         self._df_record_control_dict = self._record_action(control_dict, self._df_record_control_dict)
 
-
-
-        self._df_record_actual_production = self._record_production(control_dict,
-                                                                         self._df_record_actual_production,
-                                                                    self._df_record_state)
+        self._df_record_actual_production = self._record_production(control_dict, self._df_record_actual_production,self._df_record_state)
 
         if self.architecture['grid'] == 1:
-            self._df_record_co2 = self._record_co2({ i:self._df_record_actual_production[i][-1] for i in self._df_record_actual_production},
+            self._df_record_co2 = self._record_co2({i:self._df_record_actual_production[i][-1] for i in self._df_record_actual_production},
                                                    self._df_record_co2, self.grid.co2)
 
             self._df_record_cost = self._record_cost({ i:self._df_record_actual_production[i][-1] for i in self._df_record_actual_production},
                                                                self._df_record_cost, self._df_record_co2, self.grid.price_import, self.grid.price_export)
+
             self._df_record_state = self._update_status({key: value[-1] for key, value in self._df_record_actual_production.items()},
                                                         self._df_record_state, self._next_load, self._next_pv,
                                                         self._next_grid_status, self._next_grid_price_import,
@@ -891,26 +672,58 @@ class Microgrid:
                     'pv': next_pv,
             'hour':self._tracking_timestep%24,
         }
-        new_soc =np.nan
-        if self.architecture['battery'] == 1:
-            new_soc = df['battery_soc'][-1] + (production_dict['battery_charge'] * self.parameters['battery_efficiency'].values[0]
-                                               - production_dict['battery_discharge'] / self.parameters['battery_efficiency'].values[0]) / self.parameters['battery_capacity'].values[0]
-            #if col == 'net_load':
-            capa_to_charge = max(
-                (self.parameters['battery_soc_max'].values[0] * self.parameters['battery_capacity'].values[0] -
-                 new_soc *
-                 self.parameters['battery_capacity'].values[0]
-                 ) * self.parameters['battery_efficiency'].values[0], 0)
+        # new_soc =np.nan
+        # if self.architecture['battery'] == 1:
+        #     new_soc = df['battery_soc'][-1] + (production_dict['battery_charge'] * self.parameters['battery_efficiency'].values[0]
+        #                                        - production_dict['battery_discharge'] / self.parameters['battery_efficiency'].values[0]) / self.parameters['battery_capacity'].values[0]
+        #     #if col == 'net_load':
+        #     capa_to_charge = max(
+        #         (self.parameters['battery_soc_max'].values[0] * self.parameters['battery_capacity'].values[0] -
+        #          new_soc *flywheel
+        #          self.parameters['battery_capacity'].values[0]
+        #          ) * self.parameters['battery_efficiency'].values[0], 0)
 
-            capa_to_discharge = max((new_soc *
-                                     self.parameters['battery_capacity'].values[0]
-                                     - self.parameters['battery_soc_min'].values[0] *
-                                     self.parameters['battery_capacity'].values[0]
-                                     ) * self.parameters['battery_efficiency'].values[0], 0)
+        #     capa_to_discharge = max((new_soc *
+        #                              self.parameters['battery_capacity'].values[0]
+        #                              - self.parameters['battery_soc_min'].values[0] *
+        #                              self.parameters['battery_capacity'].values[0]
+        #                              ) * self.parameters['battery_efficiency'].values[0], 0)
 
-            new_dict['battery_soc']=new_soc
-            new_dict['capa_to_discharge'] = capa_to_discharge
-            new_dict['capa_to_charge'] = capa_to_charge
+        #     new_dict['battery_soc']=new_soc
+        #     new_dict['capa_to_discharge'] = capa_to_discharge
+        #     new_dict['capa_to_charge'] = capa_to_charge
+
+        # new_li_soc = 0
+        # new_flow_soc = 0
+        # new_flywheel_soc = 0
+
+        new_li_soc = self.ss.storage_suite['li-ion'].soc
+        new_flow_soc = self.ss.storage_suite['flow'].soc
+        new_flywheel_soc = self.ss.storage_suite['flywheel'].soc
+        
+
+        li_capa_to_charge = (1/new_li_soc) * self.li['capacity']
+        li_capa_to_discharge = new_li_soc * self.li['capacity']
+        
+        new_dict['li-ion']['soc'] = new_li_soc
+        new_dict['li-ion']['capa_to_charge'] = np.around(li_capa_to_charge,2)
+        new_dict['li-ion']['capa_to_discharge'] = np.around(li_capa_to_discharge,2)
+
+
+        flow_capa_to_charge = (1/new_flow_soc) * self.flow['capacity']
+        flow_capa_to_discharge = new_flow_soc * self.flow['capacity']
+        
+        new_dict['flow']['soc'] = new_flow_soc
+        new_dict['flow']['capa_to_charge'] = np.around(flow_capa_to_charge,2)
+        new_dict['flow']['capa_to_discharge'] = np.around(flow_capa_to_discharge,2)
+
+
+        flywheel_capa_to_charge = (1/new_flywheel_soc) * self.flywheel['capacity']
+        flywheel_capa_to_discharge = new_flywheel_soc * self.flywheel['capacity']
+        
+        new_dict['flywheel']['soc'] = new_flywheel_soc
+        new_dict['flywheel']['capa_to_charge'] = np.around(flywheel_capa_to_charge,2)
+        new_dict['flywheel']['capa_to_discharge'] = np.around(flywheel_capa_to_discharge,2)
 
         if self.architecture['grid'] == 1 :
             new_dict['grid_status'] = next_grid
@@ -962,38 +775,46 @@ class Microgrid:
 
         return p_import, p_export
 
-    def _check_constraints_battery(self, p_charge, p_discharge, status):
+    def _change_storage_charge(self, energy_sent, energy_requested, status: pd.DataFrame, device: str) -> float:
         """ This function checks that the constraints of the battery are respected."""
 
-        if p_charge < 0:
-            p_charge = 0
+        if energy_sent < 0:
+            energy_sent = 0
 
-        if p_discharge < 0:
-            p_discharge = 0
+        if energy_requested < 0:
+            energy_requested = 0
+        
+        if energy_requested > 0 and energy_sent > 0: # Error Raising 
+            raise ValueError("Cannot charge and discharge in the same timestep. Check your actions for conflicts")
 
-        if p_charge > self._zero and p_discharge > self._zero:
-            pass
+        if energy_sent > 0:
+           energy_sent, energy_stored = self.ss.storage_suite[device].charge(energy_used = energy_sent)
+           energy_pulled, energy_requested = (0,0)
+        if energy_requested > 0:
+            energy_requested, energy_pulled = self.ss.storage_suite[device].discharge(energy_requested = energy_requested)
+            energy_stored, energy_sent = (0,0)
 
-        capa_to_charge = max(
-                        (self.parameters['battery_soc_max'].values[0] * self.parameters['battery_capacity'].values[0] -
-                         status['battery_soc'][-1] *
-                         self.parameters['battery_capacity'].values[0]
-                         ) * self.parameters['battery_efficiency'].values[0], 0)
+        return  energy_stored, energy_pulled, energy_sent, energy_requested
 
-        capa_to_discharge = max((status['battery_soc'][-1] *
-                                 self.parameters['battery_capacity'].values[0]
-                                 - self.parameters['battery_soc_min'].values[0] *
-                                 self.parameters['battery_capacity'].values[0]
-                                 ) * self.parameters['battery_efficiency'].values[0], 0)
+        # capa_to_charge = max(
+        #                 (self.storage_params[device]['max_soc'] * self.parameters[device]['capacity'] -
+        #                  status[device][][-1] *
+        #                  self.storage_params[device]['capacity'].values[0]
+        #                  ) * self.storage_params[device]['eff_charge'].values[0], 0)
 
-        if p_charge > capa_to_charge or p_charge > self.parameters['battery_power_charge'].values[0]:
-            p_charge = min (capa_to_charge, self.parameters['battery_power_charge'].values[0])
+        # capa_to_discharge = max((status['battery_soc'][-1] *
+        #                          self.parameters['battery_capacity'].values[0]
+        #                          - self.parameters['battery_soc_min'].values[0] *
+        #                          self.parameters['battery_capacity'].values[0]
+        #                          ) * self.parameters['battery_efficiency'].values[0], 0)
 
+        # if energy_sent > capa_to_charge or energy_sent > self.parameters['battery_power_charge'].values[0]:
+        #     energy_sent = min (capa_to_charge, self.parameters['battery_power_charge'].values[0])
 
-        if p_discharge > capa_to_discharge or p_discharge > self.parameters['battery_power_discharge'].values[0]:
-            p_discharge = min (capa_to_discharge, self.parameters['battery_power_discharge'].values[0])
+        # if energy_resquested > capa_to_discharge or energy_resquested > self.parameters['battery_power_discharge'].values[0]:
+        #     energy_resquested = min (capa_to_discharge, self.parameters['battery_power_discharge'].values[0])
 
-        return p_charge, p_discharge
+        
 
     def _record_production(self, control_dict, production_dict, status):
         """
@@ -1023,21 +844,45 @@ class Microgrid:
 
         has_grid = self.architecture['grid'] == 1
         has_genset = self.architecture['genset'] == 1
-        has_battery = self.architecture['battery'] == 1
+        # has_battery = self.architecture['battery'] == 1
 
         sources = 0.0
         sinks = control_dict['load']
 
-        # Battery
-        if has_battery:
-            p_charge, p_discharge = self._check_constraints_battery(control_dict['battery_charge'],
-                                                                    control_dict['battery_discharge'],
-                                                                    status)
-            production_dict['battery_charge'].append(p_charge)
-            production_dict['battery_discharge'].append(p_discharge)
+        # li_ion battery
+        # if has_battery:
+        li_charge, li_discharge, li_used, li_requested = self._change_storage_charge(control_dict['li_charge'],
+                                                                control_dict['li_discharge'],
+                                                                status, device='li-ion')
+        production_dict['li_ion_charge'].append(li_charge)
+        production_dict['li_ion_discharge'].append(li_discharge+self.ss.storage_suite['li-ion'].self_discharge())
+        
+        sources += li_requested
+        sinks += li_used
 
-            sources += p_discharge
-            sinks += p_charge
+        # flow battery
+        # if has_battery:
+        flow_charge, flow_discharge, flow_used, flow_requested = self._change_storage_charge(control_dict['flow_charge'],
+                                                                control_dict['flow_discharge'],
+                                                                status, device='flow')
+        production_dict['flow_charge'].append(flow_charge)
+        production_dict['flow_discharge'].append(flow_discharge+self.ss.storage_suite['flow'].self_discharge())
+        
+        sources += flow_requested # Self discharge is not accounted for in sources
+        sinks += flow_used
+
+        # flywheel energy storage
+        # if has_battery:
+        flywheel_charge, flywheel_discharge, flywheel_used, flywheel_requested = self._change_storage_charge(control_dict['flywheel_charge'],
+                                                                control_dict['flywheel_discharge'],
+                                                                status, device='flywheel')
+        production_dict['flywheel_charge'].append(flywheel_charge)
+        production_dict['flywheel_discharge'].append(flywheel_discharge+self.ss.storage_suite['flywheel'].self_discharge())
+        
+        sources += flywheel_requested 
+        sinks += flywheel_used
+
+        
 
         if has_grid:
             p_import, p_export = self._check_constraints_grid(control_dict['grid_import'],
@@ -1104,43 +949,42 @@ class Microgrid:
 
         return df
 
-    def _record_cost(self, control_dict, df, df_co2, cost_import=0, cost_export=0):
+    def _record_cost(self, control_dict, cost_dict, df_co2, cost_import=0, cost_export=0):
         """ This function record the cost of operating the microgrid at each time step."""
 
-        if not isinstance(df, dict):
-            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(df)))
+        if not isinstance(cost_dict, dict):
+            raise TypeError('We know this should be named differently but cost_dict needs to be dict, is {}'.format(type(cost_dict)))
 
         cost_loss_load = control_dict['loss_load'] * self.parameters['cost_loss_load'].values[0]
         cost_overgeneration = control_dict['overgeneration'] * self.parameters['cost_overgeneration'].values[0]
 
-        df['loss_load'].append(cost_loss_load)
-        df['overgeneration'].append(cost_overgeneration)
+        cost_dict['loss_load'].append(cost_loss_load)
+        cost_dict['overgeneration'].append(cost_overgeneration)
 
         # cost += control_dict['loss_load'] * self.parameters['cost_loss_load'].values[0]
         # cost += control_dict['overgeneration'] * self.parameters['cost_overgeneration'].values[0]
 
         if self.architecture['genset'] == 1:
             genset_cost = control_dict['genset'] * self.parameters['fuel_cost'].values[0]
-            df['genset'].append(genset_cost)
+            cost_dict['genset'].append(genset_cost)
 
         if self.architecture['grid'] ==1:
             grid_import_cost = cost_import * control_dict['grid_import']
             grid_export_cost = - cost_export * control_dict['grid_export']
-            df['grid_import'].append(grid_import_cost)
-            df['grid_export'].append(grid_export_cost)
+            cost_dict['grid_import'].append(grid_import_cost)
+            cost_dict['grid_export'].append(grid_export_cost)
 
-
-        if self.architecture['battery'] ==1 :
-            battery_cost = (control_dict['battery_charge']+control_dict['battery_discharge'])*self.parameters['battery_cost_cycle'].values[0]
-            df['battery'].append(battery_cost)
+        
+        # li_cost = (control_dict['li_charge']+control_dict['li_discharge'])*self.parameters['battery_cost_cycle'].values[0]
+        # cost_dict['battery'].append(li_cost)
 
         co2_cost = self.parameters['cost_co2'].values[0] * df_co2['co2'][-1]
-        df['co2'].append(co2_cost)
+        cost_dict['co2'].append(co2_cost)
 
-        total_cost = np.sum([val[-1] for key, val in df.items() if key != 'total_cost'])
-        df['total_cost'].append(total_cost)
+        total_cost = np.sum([val[-1] for key, val in cost_dict.items() if key != 'total_cost'])
+        cost_dict['total_cost'].append(total_cost)
 
-        return df
+        return cost_dict
 
     ########################################################
     # PRINT FUNCTIONS

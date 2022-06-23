@@ -50,7 +50,7 @@ ZERO = 10**-5
 #     }, #Dictionary
 #     'df_actions':df_actions, #Dataframe
 #     'architecture':architecture, #Dictionary
-#     'df_variables':df_variables, #Dictionary
+#     'df_status':df_status, #Dictionary
 #     'df_actual_generation':df_actual_production,#Dataframe
 #     'grid_spec':grid_spec, #value = 0
 #     'df_cost':df_cost, #Dataframe of 1 value = 0.0
@@ -327,19 +327,14 @@ class MicrogridGenerator:
         #battery_size = self._size_battery(load)
         # return a dataframe with the power of each generator, and if applicable the number of generator
 
-        ss = StorageSuite(r'data\energy_storage_devices_v6.csv',load=size_load)
-        self.mg_stats = ss.get_properties()
-        self.mg_variables = ss.get_variables_variables()
-        for key in self.mg_stats:                                   # 
-            if key in self.mg_variables:                            # Merges dicts together for grid ceation
-                self.mg_stats[key].update(self.mg_variables[key])   #
-        
+        self.ss = StorageSuite(r'data\energy_storage_devices_v6.csv',load=size_load)
+        self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack()
         size={
             'pv': pv,
             'load': size_load,
-            'li_battery': self.mg_stats['flow']['capacity'],
-            'flow_battery': self.mg_stats['flow']['capacity'],
-            'flywheel': self.mg_stats['flywheel']['capacity'],
+            'li_battery': self.li_battery['capacity'],
+            'flow_battery': self.flow_battery['capacity'],
+            'flywheel': self.flywheel['capacity'],
             'genset': self._size_genset(load),
             'grid': int(max(load.values)*2),
         }
@@ -358,8 +353,8 @@ class MicrogridGenerator:
     # generate the microgrid
     # ##########################################
 
-    def generate_microgrid(self, verbose=True, interpolate = False):
-        """ Function used to generate the nb_microgrids to append them to the microgrids list. """
+    def generate_microgrid(self, verbose=True, interpolate = False) -> object:
+        """ Function used to generate the nb_microgrids to append them to the microgrids list. It also returns the storage suite object """
         self.interpolate = interpolate
         for i in range(self.nb_microgrids):
             #size=self._size_mg()
@@ -367,6 +362,8 @@ class MicrogridGenerator:
         
         if verbose == True:
             self.print_mg_parameters()
+        
+        return self.ss 
 
     # def _bin_genset_grid(self):
     #     rand = np.random.rand()
@@ -381,7 +378,7 @@ class MicrogridGenerator:
     #         bin_grid = 1
     #     return bin_genset, bin_grid
 
-    def _size_load(self, size_load=None):
+    def _size_load(self, size_load=None) -> int:
         if size_load is None:
             return np.random.randint(low=1E5,high=6E5)
         else:
@@ -401,7 +398,7 @@ class MicrogridGenerator:
         bin_genset, bin_grid = self._bin_genset_grid()
 
         architecture = {'PV':1, 'battery':1, 'genset':bin_genset, 'grid':bin_grid}
-        size_load = self._size_load()
+        size_load: int = self._size_load()
         load = self._scale_ts(self._get_load_ts(), size_load, scaling_method='max') #obtain dataframe of loads
         size = self._size_mg(load, size_load) #obtain a dictionary of mg sizing components
         column_actions=[]
@@ -413,16 +410,17 @@ class MicrogridGenerator:
         grid_co2_ts = []
         df_parameters = pd.DataFrame()
         # df_cost = {'cost':[]}
-        df_variables = {}
+        df_status = {}
         df_co2 = {'co2':[]}
 
         df_parameters['load'] = [size_load]
+        df_parameters['load_size'] = size_load
         df_parameters['cost_loss_load'] = 10
         df_parameters['cost_overgeneration'] = 1
         df_parameters['cost_co2'] = 0.1
         #df_cost['cost'] = [0.0]
-        df_variables['load'] = [np.around(load.iloc[0,0],1)]# --> il y a doublon pour l'instant avec l'architecture PV, -> non si pas de pv la net load est juste la load
-        df_variables['hour'] = [0]
+        df_status['load'] = [np.around(load.iloc[0,0],1)]# --> il y a doublon pour l'instant avec l'architecture PV, -> non si pas de pv la net load est juste la load
+        df_status['hour'] = [0]
         column_actual_production.append('loss_load')
         column_actual_production.append('overgeneration')
         column_actions.append('load')
@@ -438,94 +436,49 @@ class MicrogridGenerator:
             column_actions.append('pv_curtailed')
             column_actions.append('pv')
             pv = pd.DataFrame(self._scale_ts(self._get_pv_ts(), size['pv'], scaling_method='max'))
-            df_variables['pv'] = [np.around( pv.iloc[0].values[0],1)]
+            df_status['pv'] = [np.around( pv.iloc[0].values[0],1)]
 
 ##############
 # Logic for new storage types
 ##############
 
         ################ Lithium Ion Battery ###################
-
-        li_battery = self.mg_stats['li-ion']
-        df_parameters['li_ion_soc_0'] = li_battery['soc'] # The battery starts at full charge
-        df_parameters['li_ion_power_charge'] =li_battery['max_cont_power']
-        df_parameters['li_ion_power_discharge'] =li_battery['max_cont_power']
-        df_parameters['li_ion_capacity'] =li_battery['capacity']
-        df_parameters['li_ion_charge_efficiency'] =li_battery['eff_charge']
-        df_parameters['li_ion_discharge_efficiency'] =li_battery['eff_discharge']
-        df_parameters['li_ion_soc_min'] =li_battery['soc_min']
-        df_parameters['li_ion_soc_max'] =li_battery['soc_max']
-        df_parameters['li_ion_max_peak'] =li_battery['max_peak_power']
-
         column_actual_production.append('li_ion_charge')
         column_actual_production.append('li_ion_discharge')
         column_actions.append('li_ion_charge')
         column_actions.append('li_ion_discharge')
-        column_cost.append('li_ion')
-        df_variables['li_ion_soc'] = li_battery['soc']
-
-        capa_to_charge = (1/li_battery['soc']) * li_battery['capacity']
-
-        capa_to_discharge = li_battery['soc'] * li_battery['capacity']
-
-        df_variables['li_ion_capa_to_charge'] = [np.around(capa_to_charge,1)]
-        df_variables['li_ion_capa_to_discharge'] = [np.around(capa_to_discharge,1)]
+        # column_cost.append('li_ion')
+        li_capa_to_charge = (1/li_battery['soc']) * self.li_battery['capacity']
+        li_capa_to_discharge = li_battery['soc'] * self.li_battery['capacity']
+        df_status['li-ion']['soc'] = self.li_battery['soc']
+        df_status['li-ion']['capa_to_charge'] = [np.around(capa_to_charge,2)]
+        df_status['li-ion']['capa_to_discharge'] = [np.around(capa_to_discharge,2)]
         ########################################################################################
 
         ################ Ion Flow Battery ###################
-    
-        flow_battery = self.mg_stats['flow']
-        df_parameters['flow_soc_0'] = flow_battery['soc'] # The battery starts at full charge
-        df_parameters['flow_power_charge'] =flow_battery['max_cont_power']
-        df_parameters['flow_power_discharge'] =flow_battery['max_cont_power']
-        df_parameters['flow_capacity'] =flow_battery['capacity']
-        df_parameters['flow_charge_efficiency'] =flow_battery['eff_charge']
-        df_parameters['flow_discharge_efficiency'] =flow_battery['eff_discharge']
-        df_parameters['flow_soc_min'] =flow_battery['soc_min']
-        df_parameters['flow_soc_max'] =flow_battery['soc_max']
-        df_parameters['flow_max_peak'] =flow_battery['max_peak_power']
-
         column_actual_production.append('flow_charge')
         column_actual_production.append('flow_discharge')
         column_actions.append('flow_charge')
         column_actions.append('flow_discharge')
-        column_cost.append('flow')
-        df_variables['flow_soc'] = flow_battery['soc']
-
-        capa_to_charge = (1/flow_battery['soc']) * flow_battery['capacity']
-
-        capa_to_discharge = flow_battery['soc'] * flow_battery['capacity']
-        
-        df_variables['flow_capa_to_charge'] = [np.around(capa_to_charge,1)]
-        df_variables['flow_capa_to_discharge'] = [np.around(capa_to_discharge,1)]
+        # column_cost.append('flow')
+        flow_capa_to_charge = (1/self.flow_battery['soc']) * self.flow_battery['capacity']
+        flow_capa_to_discharge = self.flow_battery['soc'] * self.flow_battery['capacity']
+        df_status['flow']['soc'] = self.flow_battery['soc']
+        df_status['flow']['capa_to_charge'] = [np.around(capa_to_charge,2)]
+        df_status['flow']['capa_to_discharge'] = [np.around(capa_to_discharge,2)]
         ########################################################################################
 
         ################ Flywheel Energy Storage ###################
-
-        flywheel = self.mg_stats['flywheel']
-        df_parameters['flywheel_soc_0'] = flywheel['soc'] # The battery starts at full charge
-        df_parameters['flywheel_power_charge'] =flywheel['max_cont_power']
-        df_parameters['flywheel_power_discharge'] =flywheel['max_cont_power']
-        df_parameters['flywheel_capacity'] =flywheel['capacity']
-        df_parameters['flywheel_charge_efficiency'] =flywheel['eff_charge']
-        df_parameters['flywheel_discharge_efficiency'] =flywheel['eff_discharge']
-        df_parameters['flywheel_soc_min'] =flywheel['soc_min']
-        df_parameters['flywheel_soc_max'] =flywheel['soc_max']
-        df_parameters['flywheel_max_peak'] =flywheel['max_peak_power']
-
         column_actual_production.append('flywheel_charge')
         column_actual_production.append('flywheel_discharge')
         column_actions.append('flywheel_charge')
         column_actions.append('flywheel_discharge')
-        column_cost.append('flywheel')
-        df_variables['flywheel_soc'] = flywheel['soc']
-
-        capa_to_charge = (1/flywheel['soc']) * flywheel['capacity']
-
-        capa_to_discharge = flywheel['soc'] * flywheel['capacity']
-        
-        df_variables['flywheel_capa_to_charge'] = [np.around(capa_to_charge,1)]
-        df_variables['flywheel_capa_to_discharge'] = [np.around(capa_to_discharge,1)]
+        # column_cost.append('flywheel')
+        flywheel_capa_to_charge = (1/self.flywheel['soc']) * self.flywheel['capacity']
+        flywheel_capa_to_discharge = self.flywheel['soc'] * self.flywheel['capacity']
+        df_status['flywheel']['soc'] = self.flywheel['soc']
+        df_status['flywheel']['capa_to_charge'] = [np.around(capa_to_charge,2)]
+        df_status['flywheel']['capa_to_discharge'] = [np.around(capa_to_discharge,2)]
         ########################################################################################
 
 
@@ -550,15 +503,15 @@ class MicrogridGenerator:
             column_actions.append('grid_export')
             column_cost.append('grid_import')
             column_cost.append('grid_export')
-            df_variables['grid_variables'] = [grid_ts.iloc[0,0]]
+            df_status['grid_variables'] = [grid_ts.iloc[0,0]]
             #todo Switch back to random file to generate the new version of pymgrid25
             grid_co2_ts = self._get_co2_ts() 
-            df_variables['grid_co2'] = [grid_co2_ts.iloc[0, 0]]
+            df_status['grid_co2'] = [grid_co2_ts.iloc[0, 0]]
 
             grid_price_import_ts = grid['grid_price_import']
             grid_price_export_ts = grid['grid_price_export']
-            df_variables['grid_price_import'] = [grid_price_import_ts.iloc[0, 0]]
-            df_variables['grid_price_export'] = [grid_price_export_ts.iloc[0, 0]]
+            df_status['grid_price_import'] = [grid_price_import_ts.iloc[0, 0]]
+            df_status['grid_price_export'] = [grid_price_export_ts.iloc[0, 0]]
 
         if architecture['genset']==1:
             genset = self._get_genset(rated_power=size['genset'])
@@ -582,10 +535,10 @@ class MicrogridGenerator:
         df_cost = {key: [] for key in column_cost}
 
         microgrid_spec={
-            'parameters':df_parameters, #Dictionary
+            'parameters':df_parameters, #Dataframe
             'df_actions':df_actions, #Dataframe
             'architecture':architecture, #Dictionary
-            'df_variables':df_variables, #Dictionary
+            'df_status':df_status, #Dictionary
             'df_actual_generation':df_actual_production,#Dataframe
             'grid_spec':grid_spec, #value = 0
             'df_cost':df_cost, #Dataframe of 1 value = 0.0
@@ -597,9 +550,10 @@ class MicrogridGenerator:
             'grid_price_import' : grid_price_import_ts,
             'grid_price_export' : grid_price_export_ts,
             'grid_co2': grid_co2_ts,
+            'storage_suite': self.ss
         }
 
-        microgrid = Microgrid.Microgrid(microgrid_spec)
+        microgrid = Microgrid.Microgrid(parameters = microgrid_spec)
 
         return microgrid
     ########################################################
