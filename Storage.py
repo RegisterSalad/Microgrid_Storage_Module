@@ -318,7 +318,7 @@ class Storage:
         variables[self.TYPE]['self_discharge'] = self.get_self_discharge_rate()
         variables[self.TYPE]['peak_time_left'] = self.peak_time
 
-    def charge(self, econ_cost, energy_used=None, energy_stored=None) -> float:
+    def charge(self, econ_cost = None, energy_used: float = None, energy_stored: float = None) -> float:
         """ Returns both the energy used by the grid to charge the battery and the amount of energy actually stored by the battery.
             energy_used < energy_stored """
         if energy_stored == None:
@@ -335,12 +335,12 @@ class Storage:
 
         self.soc_cap += energy_stored
         self.soc = self.soc_cap / self.cap
-
-        econ_cost.cost += self.MARGINAL_COST * energy_used
+        if econ_cost != None:
+            econ_cost.cost += self.MARGINAL_COST * energy_used
 
         return energy_used, energy_stored
        
-    def discharge(self, econ_cost, energy_requested=None, energy_spent=None) -> float:
+    def discharge(self, econ_cost = None, energy_requested: float = None, energy_spent: float = None) -> float:
         """ Returns both the energy requested by the grid  and the actual amount pulled by the battery.
             energy_requested < energy_spent """
         if energy_requested == None:
@@ -365,8 +365,10 @@ class Storage:
         elif self.peak_time != self.INIT_PEAK_TIME:
             self.peak_time += 1
         #should consider making some of this stuff part of Storage - I accidentally started using self instead of device, after all
-        econ_cost.cost += self.MARGINAL_COST * energy_requested
-        return energy_requested
+        if econ_cost != None:
+            econ_cost.cost += self.MARGINAL_COST * energy_requested
+            
+        return energy_requested, energy_spent
 
 
     #print(0x0000024ABF413DC0)
