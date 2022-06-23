@@ -7,6 +7,7 @@ NO WARRANTY IS EXPRESSED OR IMPLIED.  USE AT YOUR OWN RISK.
 $Date: 2020/06/04 14:54 $
 Gonzague Henri
 """
+
 """
 <pymgrid is a Python library to simulate microgrids>
 Copyright (C) <2020> <Total S.A.>

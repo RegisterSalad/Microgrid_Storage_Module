@@ -184,6 +184,7 @@ class Microgrid:
             self._next_grid_price_import = self._grid_price_import.iloc[0, 0]
             self._next_grid_co2 = self._grid_co2.iloc[0, 0]
         # those dataframe record what is happening at each time step
+        self.current_status = parameters['df_status'] # Used to create record of previous timestep
         self._df_record_control_dict=parameters['df_actions']
         self._df_record_state = parameters['df_status']
         self._df_record_actual_production = parameters['df_actual_generation']
@@ -603,10 +604,28 @@ class Microgrid:
                     self._next_grid_status, self._next_grid_price_import, self._next_grid_price_export, \
                     self._next_grid_co2 = None, None, None, None
 
-        if self.architecture['battery'] == 1:
-            self.battery.soc = self._df_record_state['battery_soc'][-1]
-            self.battery.capa_to_discharge = self._df_record_state['capa_to_discharge'][-1]
-            self.battery.capa_to_charge = self._df_record_state['capa_to_charge'][-1]
+        # # if self.architecture['battery'] == 1:
+        # #     self.battery.soc = self._df_record_state['battery_soc'][-1]
+        # #     self.battery.capa_to_discharge = self._df_record_state['capa_to_discharge'][-1]
+        # #     self.battery.capa_to_charge = self._df_record_state['capa_to_charge'][-1]
+        # self.ss.storage_suite['li-ion'].soc = self._df_record_state['li-ion']['soc'][-1]
+        # self.ss.storage_suite['li-ion'].soc = self._df_record_state['li-ion']['soc'][-1]
+        # self.ss.storage_suite['flow'].soc = self._df_record_state['flow']['soc'][-1]
+
+        # self.ss.storage_suite['flywheel'].soc = self._df_record_state['flywheel']['soc'][-1]
+
+        self.current_status['li-ion']['soc'] = self._df_record_state['li-ion']['soc'][-1]
+        self.current_status['li-ion']['capa_to_charge'] = self._df_record_state['li-ion']['capa_to_charge'][-1]
+        self.current_status['li-ion']['capa_to_discharge'] = self._df_record_state['li-ion']['capa_to_discharge'][-1]
+
+        self.current_status['flow']['soc'] = self._df_record_state['flow']['soc'][-1]
+        self.current_status['flow']['capa_to_charge'] = self._df_record_state['flow']['capa_to_charge'][-1]
+        self.current_status['flow']['capa_to_discharge'] = self._df_record_state['flow']['capa_to_discharge'][-1]
+
+        self.current_status['flywheel']['soc'] = self._df_record_state['flywheel']['soc'][-1]
+        self.current_status['flywheel']['capa_to_charge'] = self._df_record_state['flywheel']['capa_to_charge'][-1]
+        self.current_status['flywheel']['capa_to_discharge'] = self._df_record_state['flywheel']['capa_to_discharge'][-1]
+
 
     def reset(self, testing=False):
         """This function is used to reset the dataframes that track what is happening in simulation. Mainly used in RL."""
