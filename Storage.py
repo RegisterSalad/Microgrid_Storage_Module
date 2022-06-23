@@ -9,7 +9,7 @@ import gc
 import ctypes
 import numpy as np
 from IPython import display
-##################################################
+############
 ''' the following is a string -> evaluation parser '''
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
@@ -31,7 +31,7 @@ def eval_(node):
     else:
         raise TypeError(node)
 
-##################################################
+############
 
 
 class StorageSuite:
@@ -108,17 +108,17 @@ class StorageSuite:
         for device in self.storage_suite:
             self.storage_suite[device].print_properties()
 
-    def discharge(self, stor_type, econ_cost, amount_wanted=None, amount_to_discharge=None):
+    def discharge(self, stor_type, econ_cost, energy_requested=None, energy_spent=None):
         ''' attempts to discharge a given device based on the usable amount wanted or the amount to remove from the device '''
         device = self.storage_suite[stor_type]
-        device.discharge(econ_cost, amount_wanted, amount_to_discharge)
-        return amount_wanted
+        device.discharge(econ_cost, energy_requested, energy_spent)
+        return energy_requested
 
-    def charge(self, stor_type, econ_cost, amount_to_supply=None, amount_to_charge=None):
+    def charge(self, stor_type, econ_cost, energy_used=None, energy_stored=None):
         ''' attempts to charge a given device based on the usable amount wanted or the amount to supply to the device '''
         device = self.storage_suite[stor_type]
-        device.charge(econ_cost, amount_to_supply, amount_to_charge)
-        return amount_to_supply
+        device.charge(econ_cost, energy_used, energy_stored)
+        return energy_used
 
 
     def self_discharge_all(self) -> None:
@@ -155,6 +155,20 @@ class StorageSuite:
         for device in self.storage_suite:
             cost = cost + properties[device]['capital_cost']
         return cost
+
+    def unpack(self) -> dict:
+        mg_stats = self.get_properties()
+        mg_variables = self.get_variables_variables()
+        for key in mg_stats:                                    # 
+            if key in mg_variables:                             # Merges dicts together for grid ceation
+                mg_stats[key].update(mg_variables[key])         #
+        
+        li_battery = mg_stats['li-ion']
+        flow_battery = mg_stats['flow']
+        flywheel = mg_stats['flywheel']
+
+        return li_battery, flow_battery, flywheel, mg_stats
+        
 
 
 
@@ -304,63 +318,56 @@ class Storage:
         variables[self.TYPE]['self_discharge'] = self.get_self_discharge_rate()
         variables[self.TYPE]['peak_time_left'] = self.peak_time
 
-    def charge(self, econ_cost, amount_to_supply=None, amount_to_charge=None):
-        if amount_to_charge == None:
-            amount_to_charge = self.eff_charge() * amount_to_supply
-        elif amount_to_supply == None:
-            amount_to_supply = amount_to_charge / self.eff_charge()
-        if (amount_to_charge * 3600) > self.power:
-            raise ValueError("Tried to charge " + self.type + str(amount_to_charge) + "kWh at " + str(amount_to_charge*3600) + "kW when the maximum able to be charged in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
-        if (self.soc_cap + amount_to_charge) > self.e:
-            raise ValueError("Tried to charge " + self.type + str(amount_to_charge) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh of capacity left.")
-        self.soc_cap += amount_to_charge
+    def charge(self, econ_cost, energy_used=None, energy_stored=None) -> float:
+        """ Returns both the energy used by the grid to charge the battery and the amount of energy actually stored by the battery.
+            energy_used < energy_stored """
+        if energy_stored == None:
+            energy_stored = self.eff_charge() * energy_used
+        elif energy_used == None:
+            energy_used = energy_stored / self.eff_charge()
+
+        #### Error Checkingf #### 
+        if (energy_stored * 3600) > self.power:
+            raise ValueError("Tried to charge " + self.type + str(energy_stored) + "kWh at " + str(energy_stored*3600) + "kW when the maximum able to be charged in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+        if (self.soc_cap + energy_stored) > self.e:
+            raise ValueError("Tried to charge " + self.type + str(energy_stored) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh of capacity left.")
+        ########################
+
+        self.soc_cap += energy_stored
         self.soc = self.soc_cap / self.cap
 
-        econ_cost.cost += self.MARGINAL_COST * amount_to_supply
+        econ_cost.cost += self.MARGINAL_COST * energy_used
 
-        return amount_to_supply
+        return energy_used, energy_stored
+       
+    def discharge(self, econ_cost, energy_requested=None, energy_spent=None) -> float:
+        """ Returns both the energy requested by the grid  and the actual amount pulled by the battery.
+            energy_requested < energy_spent """
+        if energy_requested == None:
+            energy_requested = self.eff_discharge() * energy_spent
+        elif energy_spent == None:
+            energy_spent = energy_requested / self.eff_discharge()
 
-    def discharge(self, econ_cost, amount_wanted=None, amount_to_discharge=None):
-        if amount_wanted == None:
-            amount_wanted = self.eff_discharge() * amount_to_discharge
-        elif amount_to_discharge == None:
-            amount_to_discharge = amount_wanted / self.eff_discharge()
-        if (amount_wanted * 3600) > self:
-            if (amount_wanted * 3600) < self.peak_discharge and self.peak_time == 0:
-                raise ValueError("Peak time exhausted: Tried to get " + self.type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum available this second is continuous power at " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
-            if (amount_wanted * 3600) > self.peak_discharge:
-                raise ValueError("Tried to get " + self.type + str(amount_wanted) + "kWh at " + str(amount_wanted*3600) + "kW when the maximum peak available in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
-        if (self.soc_cap - amount_to_discharge) < self.min_energy:
-            raise ValueError("Tried to discharge " + self.type + str(amount_to_discharge) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh left.")
-        self.soc_cap -= amount_to_discharge
+        ###### Error Checking ######
+        if (energy_requested * 3600) > self:
+            if (energy_requested * 3600) < self.peak_discharge and self.peak_time == 0:
+                raise ValueError("Peak time exhausted: Tried to get " + self.type + str(energy_requested) + "kWh at " + str(energy_requested*3600) + "kW when the maximum available this second is continuous power at " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+            if (energy_requested * 3600) > self.peak_discharge:
+                raise ValueError("Tried to get " + self.type + str(energy_requested) + "kWh at " + str(energy_requested*3600) + "kW when the maximum peak available in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+        if (self.soc_cap - energy_spent) < self.min_energy:
+            raise ValueError("Tried to discharge " + self.type + str(energy_spent) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh left.")
+        ###########################
+
+        self.soc_cap -= energy_spent
         self.soc = self.soc_cap / self.cap
-        if amount_wanted > self.power:
+        if energy_requested > self.power:
             self.peak_time -= 1
         elif self.peak_time != self.INIT_PEAK_TIME:
             self.peak_time += 1
         #should consider making some of this stuff part of Storage - I accidentally started using self instead of device, after all
-        econ_cost.cost += self.MARGINAL_COST * amount_wanted
-        return amount_wanted
+        econ_cost.cost += self.MARGINAL_COST * energy_requested
+        return energy_requested
 
-        
-
-if __name__ == "__main__":
-    test_ss = StorageSuite('data/energy_storage_devices_v5.csv')
-    #test_ss.user_modify_storage('li-ion', 1000)
-    #print(test_ss.storage_suite['li-ion'].self_discharge())
-    #print(test_ss.storage_suite['li-ion'].CAPITAL_COST)
-    #print(test_ss.storage_suite['li-ion'])
-    obj_id = id(test_ss.storage_suite['li-ion'])
-    print(ctypes.cast(obj_id, ctypes.py_object).value)
-    print(test_ss.storage_suite['li-ion'].cap)
-    
-    # print(test_ss.storage_suite['li-ion'].eff_charge())
-    # print(test_ss.storage_suite['li-ion'].eff_discharge())
-    # print(test_ss.storage_suite['li-ion'].current_charge())
-    test_ss.modify_ss({'li-ion':{'cap':2000}})
-    print(test_ss.storage_suite['li-ion'])
-    print(ctypes.cast(obj_id, ctypes.py_object).value)
-    print(test_ss.storage_suite['li-ion'].cap)
 
     #print(0x0000024ABF413DC0)
     #print(test_ss.storage_suite['li-ion'])
