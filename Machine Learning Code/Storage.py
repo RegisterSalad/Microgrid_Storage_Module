@@ -63,10 +63,10 @@ class StorageSuite:
             for row in reader:
                 self.device_data[row['type']] = row
         # print(self.device_data)
-        baseline_capacity_dict ={  'li-ion': round(0.25*load,2), 
-                                    'flywheel': round(0.25*load,2),
+        baseline_capacity_dict ={  'li-ion': round(load/3,2), 
+                                    'flywheel': round(load/3,2),
                                     # 'v2g': round(0.25*load,2),
-                                    'flow': round(0.25*load,2) 
+                                    'flow': round(load/3,2) 
                                 }
         for device in self.device_data:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap = float(baseline_capacity_dict[device]))
@@ -214,8 +214,8 @@ class Storage:
         self.START_WINDOW = data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
         self.END_WINDOW = data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
         """
-        self.MAX_SOC = data['max_charge'] # maximum charge as a proportion of capacity
-        self.MIN_SOC = data['min_charge'] # minimum charge as a proportion of capacity
+        self.MAX_SOC = float(data['max_charge']) # maximum charge as a proportion of capacity
+        self.MIN_SOC = float(data['min_charge']) # minimum charge as a proportion of capacity
         self.max_energy = self.cap  # * data['max_charge']  #maximum charge in kWh
         self.min_energy = 0         # * data['min_charge']  #minimum charge in kWh
         #self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate'] * 
@@ -254,9 +254,9 @@ class Storage:
         pass
 
     def get_self_discharge_rate(self): # self-discharge rate, in SOC/s
-        return eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
-        #parsed_expr = ast.parse(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
-        #return ast.literal_eval(parsed_expr)
+        return float(eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e))))
+        # parsed_expr = ast.parse(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
+        # return ast.literal_eval(parsed_expr)
     def eff_charge(self): # charge effiency function
         return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc)).replace("'", ""))
 
@@ -267,13 +267,16 @@ class Storage:
         return self.soc * self.cap
     
     def self_discharge(self):
-        delta_soc = self.get_self_discharge_rate
+        delta_soc = self.get_self_discharge_rate()
         if (self.soc - delta_soc) < self.MIN_SOC:
             self.soc = self.MIN_SOC
+            delta_soc = 0
             self.soc_cap = self.min_energy
         else:
             self.soc -= delta_soc
-            self.soc_cap = self.max_energy * self.soc    
+            self.soc_cap = self.max_energy * self.soc
+
+        return delta_soc * self.cap #Retunrs the ammount of energy lost to self discharge
     """
     def modify(self, param: dict):
         self.cap = param['cap']
@@ -329,11 +332,14 @@ class Storage:
         elif energy_used == None:
             energy_used = energy_stored / self.eff_charge()
 
-        #### Error Checkingf #### 
+        #### Error Checking #### 
         if (energy_stored * 3600) > self.power:
-            raise ValueError("Tried to charge " + self.TYPE + str(energy_stored) + "kWh at " + str(energy_stored*3600) + "kW when the maximum able to be charged in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
+            raise ValueError("Tried to charge " + self.TYPE + str(energy_stored) + " kWh at " + str(energy_stored*3600) + " kW when the maximum able to be charged in a second is " + str(self.power/3600) + " kWh at " + str(self.power) + " kW.")
         if (self.soc_cap + energy_stored) > self.cap:
-            raise ValueError("Tried to charge " + self.TYPE + str(energy_stored) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh of capacity left.")
+            self.soc = self.MAX_SOC # Charge to full
+            energy_used = self.max_energy - self.cap
+            energy_stored = energy_used
+            # raise ValueError("Tried to charge " + self.TYPE + str(energy_stored) + " kWh when there is already " + str(self.soc_cap - self.min_energy) + " kWh of capacity stored.")
         ########################
 
         self.soc_cap += energy_stored
@@ -342,7 +348,7 @@ class Storage:
         if econ_cost != None:
             econ_cost.cost += self.MARGINAL_COST * energy_used
 
-        return energy_used,energy_stored
+        return energy_used, energy_stored
        
     def discharge(self, econ_cost = None, energy_requested: float = None, energy_spent: float = None) -> float:
         """ Returns both the energy requested by the grid  and the actual amount pulled by the battery.
@@ -359,7 +365,10 @@ class Storage:
             if (energy_requested * 3600) > self.peak_discharge:
                 raise ValueError("Tried to get " + self.TYPE + str(' '+energy_requested) + "kWh at " + str(' '+energy_requested*3600) + "kW when the maximum peak available in a second is " + str(self.power/3600) + "kWh at " + str(self.power) + "kW.")
         if (self.soc_cap - energy_spent) < self.min_energy:
-            raise ValueError("Tried to discharge " + self.TYPE + str(energy_spent) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh left.")
+            self.soc = self.MIN_SOC
+            energy_spent = self.cap - self.min_energy 
+            energy_requested = energy_spent
+            # raise ValueError("Tried to discharge " + self.TYPE + str(energy_spent) + "kWh when there was only " + str(self.soc_cap - self.min_energy) + "kWh left.")
         ###########################
 
         self.soc_cap -= energy_spent
