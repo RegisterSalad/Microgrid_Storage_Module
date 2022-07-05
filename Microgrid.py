@@ -795,14 +795,12 @@ class Microgrid:
 
         if power_sent > 0:
             power_sent, power_stored = self.ss.storage_suite[device].charge(power_used = power_sent)
-            # print(f' Line 864 Works {power_sent}')
+
             power_pulled, power_requested = (0,0)
         if power_requested > 0:
             power_requested, power_pulled = self.ss.storage_suite[device].discharge(power_requested = power_requested)
-            # print(f' Line 869 Works {power_requested}')
             power_stored, power_sent = (0,0)
         if (power_requested, power_sent) == (0,0):
-            # print('Nothing Sent, nothing requested')
             return 0,0,0,0
 
         return  power_stored, power_pulled, power_sent, power_requested
@@ -837,22 +835,13 @@ class Microgrid:
 
         has_grid = self.architecture['grid'] == 1
         has_genset = self.architecture['genset'] == 1
-        # has_battery = self.architecture['battery'] == 1
 
         sources = 0.0
         sinks = control_dict['load']
 
-        # li_temp = self.li_battery.soc
-        # flow_temp = self.flow_battery.soc
-        # fly_temp = self.flywheel.soc
-
-        # li_ion battery
-        # print(f"Li power sent: {control_dict['li_charge']} W, power requested {control_dict['li_discharge']}")
         li_charge, li_discharge, li_used, li_requested = self._change_storage_charge(power_sent = control_dict['li_charge'], 
                                                                                         power_requested = control_dict['li_discharge'],
                                                                                         device='li-ion')
-        li_self_discharge = self.li_battery.self_discharge()
-        # print(f"Li-ion self-discharge = {li_self_discharge}, Li-ion charge = {li_charge}, Li-ion discharge {li_discharge}")
         production_dict['li_ion_charge'].append(li_charge)
         production_dict['li_ion_discharge'].append(li_discharge)#+li_self_discharge)
         
@@ -863,8 +852,6 @@ class Microgrid:
         flow_charge, flow_discharge, flow_used, flow_requested = self._change_storage_charge(power_sent = control_dict['flow_charge'], 
                                                                                                 power_requested = control_dict['flow_discharge'], 
                                                                                                 device='flow')
-        flow_self_discharge = self.flow_battery.self_discharge()
-        # print(f"Flow self-discharge = {flow_self_discharge}, Flow charge = {flow_charge}, Flow discharge {flow_discharge}")
         production_dict['flow_charge'].append(flow_charge)
         production_dict['flow_discharge'].append(flow_discharge)#+flow_self_discharge)
         
@@ -875,8 +862,6 @@ class Microgrid:
         flywheel_charge, flywheel_discharge, flywheel_used, flywheel_requested = self._change_storage_charge(power_sent = control_dict['flywheel_charge'], 
                                                                                                                 power_requested = control_dict['flywheel_discharge'], 
                                                                                                                 device='flywheel')
-        flywheel_self_discharge = self.flywheel.self_discharge()
-        # print(f"Flywheel self-discharge = {flywheel_self_discharge}, Flywheel charge = {flywheel_charge}, Flywheel discharge {flywheel_discharge}")
         production_dict['flywheel_charge'].append(flywheel_charge)
         production_dict['flywheel_discharge'].append(flywheel_discharge)#+flywheel_self_discharge)
         
@@ -926,10 +911,6 @@ class Microgrid:
             loss_load = 0
             pv_curtailed = pv_available if pv_available > 0 else 0
             overgeneration = -pv_required
-
-        # li_delta = abs(self.li_battery.soc - li_temp)
-        # flow_delta = abs(self.flow_battery.soc - flow_temp)
-        # fly_delta = abs(self.flywheel.soc - fly_temp)
 
         production_dict['pv_consummed'].append(pv_consumed)
         production_dict['loss_load'].append(loss_load)

@@ -463,9 +463,6 @@ class MicrogridGenerator:
         column_actual_production.append('li_ion_discharge')
         column_actions.append('li_ion_charge')
         column_actions.append('li_ion_discharge')
-        # column_cost.append('li_ion')
-        # li_capa_to_charge = (1/self.li_battery.soc) * self.li_battery.cap
-        # li_capa_to_discharge = self.li_battery.soc * self.li_battery.cap
         df_status['li_ion_soc'] = [self.li_battery.soc]
         df_status['li_ion_capa_to_charge'] = [self.li_battery.capa_to_charge]
         df_status['li_ion_capa_to_discharge'] = [self.li_battery.capa_to_discharge]
@@ -476,9 +473,6 @@ class MicrogridGenerator:
         column_actual_production.append('flow_discharge')
         column_actions.append('flow_charge')
         column_actions.append('flow_discharge')
-        # column_cost.append('flow')
-        # flow_capa_to_charge = (1/self.flow_battery.soc) * self.flow_battery.cap
-        # flow_capa_to_discharge = self.flow_battery.soc * self.flow_battery.cap
         df_status['flow_soc'] = [self.flow_battery.soc]
         df_status['flow_capa_to_charge'] = [self.flow_battery.capa_to_charge]
         df_status['flow_capa_to_discharge'] = [self.flow_battery.capa_to_discharge]
@@ -489,9 +483,6 @@ class MicrogridGenerator:
         column_actual_production.append('flywheel_discharge')
         column_actions.append('flywheel_charge')
         column_actions.append('flywheel_discharge')
-        # column_cost.append('flywheel')
-        # flywheel_capa_to_charge = (1/self.flywheel.soc) * self.flywheel.cap
-        # flywheel_capa_to_discharge = self.flywheel.soc * self.flywheel.cap
         df_status['flywheel_soc'] = [self.flywheel.soc]
         df_status['flywheel_capa_to_charge'] = [self.flywheel.capa_to_charge]
         df_status['flywheel_capa_to_discharge'] = [self.flywheel.capa_to_discharge]
