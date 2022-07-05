@@ -100,7 +100,11 @@ class DQAgent(object):
             action = torch.argmax(q)                                                      #selection action with highest q value
         return int(action)
 
+<<<<<<< HEAD
     def learn(self) -> None:
+=======
+    def learn(self):
+>>>>>>> 44466080ed56415db524f196910e8632b5b9c2af
         if self.replay_buffer.mem_counter < self.min_memory_for_training:
             return
         states, actions, rewards, new_states, dones = self.replay_buffer.sample_memory(self.batch_size) #retrieve a batch from memory
