@@ -7,9 +7,9 @@ import MicrogridGenerator as mg
 import Microgrid
 
 
-storage_data_argument = sys.argv[1]
-capital_cost_limit_argument = sys.argv[2]
-master_storage_suite = Storage.StorageSuite(storage_data_argument)
+# storage_data_argument = sys.argv[1]
+# capital_cost_limit_argument = sys.argv[2]
+master_storage_suite = StorageSuite(storage_data_argument)
 device_capital_costs = master_storage_suite.get_device_capital_costs()
 dcc = device_capital_costs
 linear_constraint = LinearConstraint(dcc, 0, capital_cost_limit_argument)
@@ -21,9 +21,7 @@ def microgrid_start(storage_suite_param):
     m_gen.microgrids[0].train_test_split()
     return m_gen.microgrids[0].econ_cost
 
-
-
-x0 = numpy.zeros((len(dcc), len(dcc)))
+x0 = np.zeros((len(dcc), len(dcc)))
 res = minimize(microgrid_start, x0, 'trust-constr', constraints=linear_constraint)
 
 """

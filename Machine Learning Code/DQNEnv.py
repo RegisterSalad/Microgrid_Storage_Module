@@ -63,6 +63,7 @@ class DQNetwork(torch.nn.Module):
             torch.nn.Linear(14, 14),
             torch.nn.ReLU(),
             torch.nn.Linear(13, n_actions)
+        )
         self.optimizer = Adam(self.parameters(), lr = learning_rate)
         self.loss = torch.nn.MSELoss(reduction='sum')
         self.to(self.device)
