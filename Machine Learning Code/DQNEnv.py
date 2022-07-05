@@ -9,11 +9,11 @@ Created on Fri Nov 27 12:23:25 2020
 """
 
 import numpy as np
-import sys
 from pyrsistent import b
 import torch
 from torch.optim import Adam
-from torch.nn import Linear, ReLU, Dropout, BatchNorm1d
+from torch.nn import Linear, ReLU, Sequential, MSELoss
+
 class ReplayBuffer(object):
     def __init__(self, state_len, mem_size):
         self.state_len = state_len
@@ -53,19 +53,19 @@ class DQNetwork(torch.nn.Module):
         print(torch.cuda.is_available())
         self.learning_rate = learning_rate
         self.n_actions = n_actions
-        self.network = torch.nn.Sequential(
-            torch.nn.Linear(state_len,16),
-            torch.nn.ReLU(),
-            torch.nn.Linear(16, 16),
-            torch.nn.ReLU(),
-            torch.nn.Linear(15, 15),
-            torch.nn.ReLU(),
-            torch.nn.Linear(14, 14),
-            torch.nn.ReLU(),
-            torch.nn.Linear(13, n_actions)
+        self.network = Sequential(
+            Linear(state_len,16),
+            ReLU(),
+            Linear(16, 16),
+            ReLU(),
+            Linear(15, 15),
+            ReLU(),
+            Linear(14, 14),
+            ReLU(),
+            Linear(13, n_actions)
         )
         self.optimizer = Adam(self.parameters(), lr = learning_rate)
-        self.loss = torch.nn.MSELoss(reduction='sum')
+        self.loss = MSELoss(reduction='sum')
         self.to(self.device)
 
 

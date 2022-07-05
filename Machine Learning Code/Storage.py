@@ -63,22 +63,13 @@ class StorageSuite:
             reader = csv.DictReader(devices_file)
             for row in reader:
                 self.device_data[row['type']] = row
-        # print(self.device_data)
-        # baseline_capacity_dict ={  'li-ion': round(self.load/3,2), 
-        #                             'flywheel': round(self.load/3,2),
-        #                             # 'v2g': round(0.25*load,2),
-        #                             'flow': round(self.load/3,2) 
-        #                         }
-
         baseline_capacity_dict ={  'li-ion': load/3,
                                     'flywheel': load/3,
                                     # 'v2g': round(0.25*load,2),
                                     'flow': load/3
                                 }
-        
         for device in self.device_data:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap = float(baseline_capacity_dict[device]))
-        print(self.storage_suite)
         
 
     def modify_ss(self, param: dict): # 
@@ -217,7 +208,6 @@ class Storage:
         self.power = power # power
         if self.power == 0:
             self.power = eval_expr(str(data['max_cont_discharge'].replace("x", str(self.cap)))) # Returns in W
-        print(self.power)
         """
         self.START_WINDOW = data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
         self.END_WINDOW = data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
@@ -245,7 +235,7 @@ class Storage:
         def peak_discharge(self):
             return eval_expr(self.FORMULA_PEAK_DISCHARGE.replace("self.cap", str(self.cap)).replace("self.power", str(self.power))) # assumed 10s peak capability, in W
         def capital_cost(self): # independent capacity and power capital cost formula
-            return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap)).replace("y", str(self.power)).replace("'", ""))
+            return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap/1000)).replace("y", str(self.power/1000)).replace("'", ""))
         self.capital_cost = capital_cost(self)
         self.peak_discharge = peak_discharge(self) # In W
         
