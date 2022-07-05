@@ -1,5 +1,5 @@
 import sys
-import Storage
+from Storage import StorageSuite
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import LinearConstraint
