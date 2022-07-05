@@ -1,0 +1,4 @@
+﻿type,max_charge,min_charge,max_cont_discharge,max_peak_discharge,min_discharge,eff_charge,eff_discharge,self_discharge,capital_cost,marginal_cost,resp_time,usable_start,usable_end,fixed_cap,cap_power_ind,peak_time
+li-ion,1,0.1,(0.4*x),(0.6*x),0,0.95,0.95,(3.8061*10**-15)*e**(21.3235*x),650*x,,,None,None,None,FALSE,10
+flywheel,1,0.1,(0.86*0.25*x),(0.86*0.25*x),0,29*x**4/((1.01105*29*x**2+0.199918*29*x-0.165293)*(1.00075*29*x**2+0.279493*29*x+0.0342874)),29*x**4/((1.01105*29*x**2+0.199918*29*x-0.165293)*(1.00075*29*x**2+0.279493*29*x+0.0342874)),(7.4777529*x+8.52548*(29*x)**(1/2)+57.118)/10000,1500*x,,<1s,None,None,None,FALSE,0
+flow,1,0.1,(1.2*x),(1.2*x),0,0.883,0.883,0,(271.617*x + 1209.795*y + 140903.704),,<1s,None,None,None,FALSE,0

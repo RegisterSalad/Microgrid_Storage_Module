@@ -20,40 +20,38 @@ You should have received a copy of the GNU Lesser General Public License along w
 
 """
 
+from typing import List
 import pandas as pd
 import numpy as np
 from copy import copy
 import cvxpy as cp
 import operator
 import sys
-from plotly.offline import init_notebook_mode, iplot
+# from plotly.offline import init_notebook_mode, iplot
 import matplotlib.pyplot as plt
 import cufflinks as cf
 from IPython.display import display
 from IPython import get_ipython
 from pymgrid.algos.Control import Benchmarks
 
-from Storage import StorageSuite
-# from Storage import StorageSuite as ss
+# def in_ipynb():
+#     try:
+#         cfg = get_ipython().config
+#         if cfg['IPKernelApp']['parent_appname'] == 'ipython-notebook':
+#             return True
+#         else:
+#             return False
+#     except (NameError, AttributeError):
+#         return False
 
-def in_ipynb():
-    try:
-        cfg = get_ipython().config
-        if cfg['IPKernelApp']['parent_appname'] == 'ipython-notebook':
-            return True
-        else:
-            return False
-    except (NameError, AttributeError):
-        return False
-
-if in_ipynb():
-    init_notebook_mode(connected=False)
+# if in_ipynb():
+#     init_notebook_mode(connected=False)
 
 np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 31579200 #in seconds
+DEFAULT_HORIZON = 31579200/900 #in seconds
 DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
@@ -62,6 +60,55 @@ The following classes are used to contain the information related to the differe
 of the microgrid. Their main use is for easy access in a notebook.
 '''
 
+# class LiBattery:
+#     ''' Holds data about the Lithium Ion Battery object of the grid. '''
+#     def __init__(self, li_battery_object):
+#         self.soc = li_battery_object['soc']
+#         self.soc_max = li_battery_object['max_soc']
+#         self.soc_min = li_battery_object['min_soc']
+#         self.cap = li_battery_object['capacity']
+#         self.capa_to_charge = self.cap/self.soc
+#         self.capa_to_discharge = self.cap*self.soc
+#         self.eff_charge = li_battery_object['eff_charge']
+#         self.eff_discharge = li_battery_object['eff_discharge']
+#         self.self_discharge = li_battery_object['self_discharge'] # Energy loss per timestep
+#         self.peak_time = li_battery_object['peak_time_left']
+#         self.capital_cost = li_battery_object['capital_cost']
+#         self.max_peak_time = li_battery_object['max_peak_time']
+
+
+# class FlowBattery:
+#     ''' Holds data about the Flow Battery object of the grid. '''
+#     def __init__(self, flow_battery_object):
+#         self.soc = flow_battery_object['soc']
+#         self.soc_max = flow_battery_object['max_soc']
+#         self.soc_min = flow_battery_object['min_soc']
+#         self.cap = flow_battery_object['capacity']
+#         self.capa_to_charge = self.cap/self.soc
+#         self.capa_to_discharge = self.cap*self.soc
+#         self.eff_charge = flow_battery_object['eff_charge']
+#         self.eff_discharge = flow_battery_object['eff_discharge']
+#         self.self_discharge = flow_battery_object['self_discharge'] # Energy loss per timestep
+#         self.peak_time = flow_battery_object['peak_time_left']
+#         self.capital_cost = flow_battery_object['capital_cost']
+#         self.max_peak_time = flow_battery_object['max_peak_time']
+
+
+# class FlywheelBattery:
+#     ''' Holds data about the Flywheel Battery object of the grid. '''
+#     def __init__(self, flywheel_object):
+#         self.soc = flywheel_object['soc']
+#         self.soc_max = flywheel_object['max_soc']
+#         self.soc_min = flywheel_object['min_soc']
+#         self.cap = flywheel_object['capacity']
+#         self.capa_to_charge = self.cap/self.soc
+#         self.capa_to_discharge = self.cap*self.soc
+#         self.eff_charge = flywheel_object['eff_charge']
+#         self.eff_discharge = flywheel_object['eff_discharge']
+#         self.self_discharge = flywheel_object['self_discharge'] # Energy loss per timestep
+#         self.peak_time = flywheel_object['peak_time_left']
+#         self.capital_cost = flywheel_object['capital_cost']
+#         self.max_peak_time = flywheel_object['max_peak_time']
 
 
 class Genset:
@@ -105,6 +152,9 @@ class Genset:
         self.p_max = param['genset_pmax'].values[0]
         self.fuel_cost = param['fuel_cost'].values[0]
         self.co2 = param['genset_co2'].values[0]
+
+
+
 
 
 class Grid:
@@ -159,37 +209,37 @@ class Grid:
 
 class Microgrid:
 
-    def __init__(self, parameters, horizon=DEFAULT_HORIZON, timestep=DEFAULT_TIMESTEP):
+    def __init__(self, microgrid_spec, horizon=DEFAULT_HORIZON, timestep=DEFAULT_TIMESTEP):
         #list of parameters
         #this is a static dataframe: parameters of the microgrid that do not change with time
-        self._param_check(parameters)
-        self.parameters = parameters['parameters']
-        self.architecture = parameters['architecture']
-        self.size_load = parameters['load_size']
+        self._param_check(microgrid_spec)
+        self.parameters = microgrid_spec['parameters']
+        self.architecture = microgrid_spec['architecture']
+        self.size_load = microgrid_spec['parameters']['load_size']
         #different timeseries
-        self._load_ts=parameters['load']
-        self._pv_ts=parameters['pv']
+        self._load_ts=microgrid_spec['load']
+        self._pv_ts=microgrid_spec['pv']
         self.pv = self._pv_ts.iloc[0,0]
         self.load = self._load_ts.iloc[0, 0]
         self._next_load = self._load_ts.iloc[1,0]
         self._next_pv = self._pv_ts.iloc[1,0]
-        if parameters['architecture']['grid']==1:
-            self._grid_status_ts=parameters['grid_ts'] #time series of outages
+        if microgrid_spec['architecture']['grid']==1:
+            self._grid_status_ts=microgrid_spec['grid_ts'] #time series of outages
             #self.grid_status = self._grid_status_ts.iloc[0, 0]
-            self._grid_price_import=parameters['grid_price_import']
-            self._grid_price_export=parameters['grid_price_export']
-            self._grid_co2 = parameters['grid_co2']
+            self._grid_price_import=microgrid_spec['grid_price_import']
+            self._grid_price_export=microgrid_spec['grid_price_export']
+            self._grid_co2 = microgrid_spec['grid_co2']
             self._next_grid_status = self._grid_status_ts.iloc[0, 0]
             self._next_grid_price_export = self._grid_price_export.iloc[0, 0]
             self._next_grid_price_import = self._grid_price_import.iloc[0, 0]
             self._next_grid_co2 = self._grid_co2.iloc[0, 0]
         # those dataframe record what is happening at each time step
-        self.current_status = parameters['df_status'] # Used to create record of previous timestep
-        self._df_record_control_dict=parameters['df_actions']
-        self._df_record_state = parameters['df_status']
-        self._df_record_actual_production = parameters['df_actual_generation']
-        self._df_record_cost = parameters['df_cost']
-        self._df_record_co2 = parameters['df_co2']
+        # self.current_status = parameters['df_status'] # Used to create record of previous timestep
+        self._df_record_control_dict=microgrid_spec['df_actions']
+        self._df_record_state = microgrid_spec['df_status']
+        self._df_record_actual_production = microgrid_spec['df_actual_generation']
+        self._df_record_cost = microgrid_spec['df_cost']
+        self._df_record_co2 = microgrid_spec['df_co2']
         self._df_cost_per_epochs = []
         self.horizon = horizon
         self._tracking_timestep = 0
@@ -200,12 +250,12 @@ class Microgrid:
         self._has_train_test_split = False
         self._epoch=0
         self._zero = ZERO
-        self.control_dict = parameters['control_dict']
+        self.control_dict = microgrid_spec['control_dict']
         self._data_set_to_use_default = 'all'
         self._data_set_to_use = 'all'
         self.benchmarks = Benchmarks(self)
-        self.ss = parameters['storage_suite'] # Load Storage class objects
-        self.li_battery, self.flow_battery, self.flywheel, self.storage_params = self.ss.unpack() # unpack into usable format, same from MicrogridGenerator.py
+        self.ss = microgrid_spec['storage_suite'] # Load Storage class objects
+        self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack() # These are all objects
         if self.architecture['genset'] == 1:
             self.genset = Genset(self.parameters)
         if self.architecture['grid'] == 1:
@@ -242,7 +292,7 @@ class Microgrid:
 
         # Ensure various DataFrames exist and are in fact DataFrames
 
-        keys = ('parameters', 'load', 'pv', 'df_actions', 'df_status', 'df_actual_generation', 'df_cost')
+        keys = ('parameters', 'load', 'pv')
 
         for key in keys:
             try:
@@ -298,7 +348,7 @@ class Microgrid:
         """ Function that returns the co2 emissions associated to the operation of the last time step. """
         return self._df_record_co2['co2'][-1]
 
-    def get_updated_values(self):
+    def get_updated_values(self) -> dict:
         """
         Function that returns microgrid parameters that change with time. Depending on the architecture we have:
             - PV production
@@ -423,10 +473,11 @@ class Microgrid:
 
     #if return whole pv and load ts, the time can be counted in notebook
     def run(self, control_dict):
+
         control_dict['load'] = self.load
         control_dict['pv'] = self.pv
 
-        self._df_record_control_dict = self._record_action(control_dict, self._df_record_control_dict)
+        self._df_record_control_dict = self._record_action(control_dict = control_dict, record_status = self._df_record_control_dict)
 
         self._df_record_actual_production = self._record_production(control_dict, self._df_record_actual_production,self._df_record_state)
 
@@ -437,10 +488,10 @@ class Microgrid:
             self._df_record_cost = self._record_cost({ i:self._df_record_actual_production[i][-1] for i in self._df_record_actual_production},
                                                                self._df_record_cost, self._df_record_co2, self.grid.price_import, self.grid.price_export)
 
-            self._df_record_state = self._update_status({key: value[-1] for key, value in self._df_record_actual_production.items()},
-                                                        self._df_record_state, self._next_load, self._next_pv,
-                                                        self._next_grid_status, self._next_grid_price_import,
-                                                        self._next_grid_price_export, self._next_grid_co2)
+            self._df_record_state = self._update_status(production_dict={key: value[-1] for key, value in self._df_record_actual_production.items()},
+                                                        record_state = self._df_record_state,next_load= self._next_load,next_pv= self._next_pv,
+                                                        next_grid = self._next_grid_status, next_price_import= self._next_grid_price_import,
+                                                        next_price_export= self._next_grid_price_export, next_co2= self._next_grid_co2)
 
 
         else:
@@ -452,14 +503,16 @@ class Microgrid:
             self._df_record_state = self._update_status(control_dict,
                                                         self._df_record_state, self._next_load, self._next_pv)
 
-        if self._tracking_timestep == self._data_length - self.horizon or self._tracking_timestep == self._data_length - 1:
+        # if self._tracking_timestep == self._data_length - self.horizon or self._tracking_timestep == self._data_length - 1:  
+        if self._tracking_timestep == self.horizon or self._tracking_timestep == self._data_length - 1:  
             self.done = True
-            return self.get_updated_values()
+            return list(self.get_updated_values().values()), self.get_cost()/4_000, self.done
 
         self._tracking_timestep += 1
         self.update_variables()
 
-        return self.get_updated_values()
+        return list(self.get_updated_values().values()), self.get_cost()/4_000, self.done
+        # return list(self.get_updated_values().values()), -self.get_cost()/4_000, self.done
 
 
     def train_test_split(self, train_size=0.67, shuffle = False, cancel=False):
@@ -537,7 +590,6 @@ class Microgrid:
 
     def update_variables(self):
         """ Function that updates the variablers containing the parameters of the microgrid changing with time. """
-
         if self._data_set_to_use == 'training':
             self.pv = self._pv_train.iloc[self._tracking_timestep, 0]
             self.load = self._load_train.iloc[self._tracking_timestep, 0]
@@ -604,30 +656,9 @@ class Microgrid:
                     self._next_grid_status, self._next_grid_price_import, self._next_grid_price_export, \
                     self._next_grid_co2 = None, None, None, None
 
-        # # if self.architecture['battery'] == 1:
-        # #     self.battery.soc = self._df_record_state['battery_soc'][-1]
-        # #     self.battery.capa_to_discharge = self._df_record_state['capa_to_discharge'][-1]
-        # #     self.battery.capa_to_charge = self._df_record_state['capa_to_charge'][-1]
-        # self.ss.storage_suite['li-ion'].soc = self._df_record_state['li-ion']['soc'][-1]
-        # self.ss.storage_suite['li-ion'].soc = self._df_record_state['li-ion']['soc'][-1]
-        # self.ss.storage_suite['flow'].soc = self._df_record_state['flow']['soc'][-1]
-
-        # self.ss.storage_suite['flywheel'].soc = self._df_record_state['flywheel']['soc'][-1]
-
-        self.current_status['li-ion']['soc'] = self._df_record_state['li-ion']['soc'][-1]
-        self.current_status['li-ion']['capa_to_charge'] = self._df_record_state['li-ion']['capa_to_charge'][-1]
-        self.current_status['li-ion']['capa_to_discharge'] = self._df_record_state['li-ion']['capa_to_discharge'][-1]
-
-        self.current_status['flow']['soc'] = self._df_record_state['flow']['soc'][-1]
-        self.current_status['flow']['capa_to_charge'] = self._df_record_state['flow']['capa_to_charge'][-1]
-        self.current_status['flow']['capa_to_discharge'] = self._df_record_state['flow']['capa_to_discharge'][-1]
-
-        self.current_status['flywheel']['soc'] = self._df_record_state['flywheel']['soc'][-1]
-        self.current_status['flywheel']['capa_to_charge'] = self._df_record_state['flywheel']['capa_to_charge'][-1]
-        self.current_status['flywheel']['capa_to_discharge'] = self._df_record_state['flywheel']['capa_to_discharge'][-1]
 
 
-    def reset(self, testing=False):
+    def reset(self, testing=False) -> list:
         """This function is used to reset the dataframes that track what is happening in simulation. Mainly used in RL."""
         if self._data_set_to_use == 'training':
             temp_cost = copy(self._df_record_cost)
@@ -651,113 +682,68 @@ class Microgrid:
                 self._data_length = min(self._load_train.shape[0], self._pv_train.shape[0])
             else:
                 self._data_length = min(self._load_ts.shape[0], self._pv_ts.shape[0])
-
+        self.li_battery.soc == self.li_battery.MAX_SOC
+        self.flow_battery.soc == self.flow_battery.MAX_SOC
+        self.flywheel.soc == self.flywheel.MAX_SOC
         self.update_variables()
         self.done = False
-
-
-
         self._epoch+=1
-
+        return list(self.get_updated_values().values())
 
     ########################################################
     # FUNCTIONS TO UPDATE THE INTERNAL DICTIONARIES
     ########################################################
 
 
-    def _record_action(self, control_dict, df):
+    def _record_action(self, control_dict, record_status):
         """ This function is used to record the actions taken, before being checked for feasability. """
-        if not isinstance(df, dict):
-            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(df)))
-        for j in df:
+        if not isinstance(record_status, dict):
+            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(record_status)))
+        for j in record_status:
             if j in control_dict.keys():
-                df[j].append(control_dict[j])
+                record_status[j].append(control_dict[j])
             else:
-                df[j].append({j:0})
+                record_status[j].append({j:0})
         #df = df.append(control_dict,ignore_index=True)
 
-        return df
+        return record_status
 
 
-    def _update_status(self, production_dict, df, next_load, next_pv, next_grid = 0, next_price_import =0, next_price_export = 0, next_co2 = 0):
+    def _update_status(self, production_dict, record_state: dict, next_load, next_pv, next_grid = 0, next_price_import =0, next_price_export = 0, next_co2 = 0):
         """ This function update the parameters of the microgrid that change with time. """
         #self.df_status = self.df_status.append(self.new_row, ignore_index=True)
 
-        if not isinstance(df, dict):
-            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(df)))
+        if not isinstance(record_state, dict):
+            raise TypeError('We know this should be named differently but df needs to be dict, is {}'.format(type(record_state)))
 
         new_dict = {
             'load': next_load,
                     'pv': next_pv,
-            'hour':self._tracking_timestep%24,
+            'hour':self._tracking_timestep%4,
         }
-        # new_soc =np.nan
-        # if self.architecture['battery'] == 1:
-        #     new_soc = df['battery_soc'][-1] + (production_dict['battery_charge'] * self.parameters['battery_efficiency'].values[0]
-        #                                        - production_dict['battery_discharge'] / self.parameters['battery_efficiency'].values[0]) / self.parameters['battery_capacity'].values[0]
-        #     #if col == 'net_load':
-        #     capa_to_charge = max(
-        #         (self.parameters['battery_soc_max'].values[0] * self.parameters['battery_capacity'].values[0] -
-        #          new_soc *flywheel
-        #          self.parameters['battery_capacity'].values[0]
-        #          ) * self.parameters['battery_efficiency'].values[0], 0)
 
-        #     capa_to_discharge = max((new_soc *
-        #                              self.parameters['battery_capacity'].values[0]
-        #                              - self.parameters['battery_soc_min'].values[0] *
-        #                              self.parameters['battery_capacity'].values[0]
-        #                              ) * self.parameters['battery_efficiency'].values[0], 0)
-
-        #     new_dict['battery_soc']=new_soc
-        #     new_dict['capa_to_discharge'] = capa_to_discharge
-        #     new_dict['capa_to_charge'] = capa_to_charge
-
-        # new_li_soc = 0
-        # new_flow_soc = 0
-        # new_flywheel_soc = 0
-
-        new_li_soc = self.ss.storage_suite['li-ion'].soc
-        new_flow_soc = self.ss.storage_suite['flow'].soc
-        new_flywheel_soc = self.ss.storage_suite['flywheel'].soc
-        
-
-        li_capa_to_charge = (1/new_li_soc) * self.li['capacity']
-        li_capa_to_discharge = new_li_soc * self.li['capacity']
-        
-        new_dict['li-ion']['soc'] = new_li_soc
-        new_dict['li-ion']['capa_to_charge'] = np.around(li_capa_to_charge,2)
-        new_dict['li-ion']['capa_to_discharge'] = np.around(li_capa_to_discharge,2)
-
-
-        flow_capa_to_charge = (1/new_flow_soc) * self.flow['capacity']
-        flow_capa_to_discharge = new_flow_soc * self.flow['capacity']
-        
-        new_dict['flow']['soc'] = new_flow_soc
-        new_dict['flow']['capa_to_charge'] = np.around(flow_capa_to_charge,2)
-        new_dict['flow']['capa_to_discharge'] = np.around(flow_capa_to_discharge,2)
-
-
-        flywheel_capa_to_charge = (1/new_flywheel_soc) * self.flywheel['capacity']
-        flywheel_capa_to_discharge = new_flywheel_soc * self.flywheel['capacity']
-        
-        new_dict['flywheel']['soc'] = new_flywheel_soc
-        new_dict['flywheel']['capa_to_charge'] = np.around(flywheel_capa_to_charge,2)
-        new_dict['flywheel']['capa_to_discharge'] = np.around(flywheel_capa_to_discharge,2)
+        new_dict['li_ion_soc'] = self.li_battery.soc
+        new_dict['li_ion_capa_to_charge'] = self.li_battery.capa_to_charge
+        new_dict['li_ion_capa_to_discharge'] = self.li_battery.capa_to_discharge
+        new_dict['flow_soc'] = self.flow_battery.soc
+        new_dict['flow_capa_to_charge'] = self.flow_battery.capa_to_charge
+        new_dict['flow_capa_to_discharge'] = self.flow_battery.capa_to_discharge
+        new_dict['flywheel_soc'] = self.flywheel.soc
+        new_dict['flywheel_capa_to_charge'] = self.flywheel.capa_to_charge
+        new_dict['flywheel_capa_to_discharge'] = self.flywheel.capa_to_discharge
 
         if self.architecture['grid'] == 1 :
             new_dict['grid_status'] = next_grid
-            new_dict['grid_price_import'] = next_price_import
-            new_dict['grid_price_export'] = next_price_export
+            new_dict['grid_price_import'] = (0.11/4_000)*production_dict['grid_import']
+            new_dict['grid_price_export'] = (0.05/4_000)*production_dict['grid_export']
             new_dict['grid_co2'] = next_co2
 
-        for j in df:
-            df[j].append(new_dict[j])
+        
+        for j in record_state:
+            if j in new_dict.keys():
+                record_state[j].append(new_dict[j])
 
-        #df = df.append(dict,ignore_index=True)
-
-
-
-        return df
+        return record_state
 
 
     #now we consider all the generators on all the time (mainly concern genset)
@@ -794,44 +780,32 @@ class Microgrid:
 
         return p_import, p_export
 
-    def _change_storage_charge(self, energy_sent, energy_requested, status: pd.DataFrame, device: str) -> float:
+    def _change_storage_charge(self, power_sent: float, power_requested: float, device: str) -> float:
         """ This function checks that the constraints of the battery are respected."""
 
-        if energy_sent < 0:
-            energy_sent = 0
+        if power_sent < 0:
+            power_sent = 0
+            # print('wHAT')
 
-        if energy_requested < 0:
-            energy_requested = 0
+        if power_requested < 0:
+            power_requested = 0
         
-        if energy_requested > 0 and energy_sent > 0: # Error Raising 
+        if power_requested > 0 and power_sent > 0: # Error Raising 
             raise ValueError("Cannot charge and discharge in the same timestep. Check your actions for conflicts")
 
-        if energy_sent > 0:
-           energy_sent, energy_stored = self.ss.storage_suite[device].charge(energy_used = energy_sent)
-           energy_pulled, energy_requested = (0,0)
-        if energy_requested > 0:
-            energy_requested, energy_pulled = self.ss.storage_suite[device].discharge(energy_requested = energy_requested)
-            energy_stored, energy_sent = (0,0)
+        if power_sent > 0:
+            power_sent, power_stored = self.ss.storage_suite[device].charge(power_used = power_sent)
+            # print(f' Line 864 Works {power_sent}')
+            power_pulled, power_requested = (0,0)
+        if power_requested > 0:
+            power_requested, power_pulled = self.ss.storage_suite[device].discharge(power_requested = power_requested)
+            # print(f' Line 869 Works {power_requested}')
+            power_stored, power_sent = (0,0)
+        if (power_requested, power_sent) == (0,0):
+            # print('Nothing Sent, nothing requested')
+            return 0,0,0,0
 
-        return  energy_stored, energy_pulled, energy_sent, energy_requested
-
-        # capa_to_charge = max(
-        #                 (self.storage_params[device]['max_soc'] * self.parameters[device]['capacity'] -
-        #                  status[device][][-1] *
-        #                  self.storage_params[device]['capacity'].values[0]
-        #                  ) * self.storage_params[device]['eff_charge'].values[0], 0)
-
-        # capa_to_discharge = max((status['battery_soc'][-1] *
-        #                          self.parameters['battery_capacity'].values[0]
-        #                          - self.parameters['battery_soc_min'].values[0] *
-        #                          self.parameters['battery_capacity'].values[0]
-        #                          ) * self.parameters['battery_efficiency'].values[0], 0)
-
-        # if energy_sent > capa_to_charge or energy_sent > self.parameters['battery_power_charge'].values[0]:
-        #     energy_sent = min (capa_to_charge, self.parameters['battery_power_charge'].values[0])
-
-        # if energy_resquested > capa_to_discharge or energy_resquested > self.parameters['battery_power_discharge'].values[0]:
-        #     energy_resquested = min (capa_to_discharge, self.parameters['battery_power_discharge'].values[0])
+        return  power_stored, power_pulled, power_sent, power_requested
 
         
 
@@ -868,35 +842,43 @@ class Microgrid:
         sources = 0.0
         sinks = control_dict['load']
 
+        # li_temp = self.li_battery.soc
+        # flow_temp = self.flow_battery.soc
+        # fly_temp = self.flywheel.soc
+
         # li_ion battery
-        # if has_battery:
-        li_charge, li_discharge, li_used, li_requested = self._change_storage_charge(control_dict['li_charge'],
-                                                                control_dict['li_discharge'],
-                                                                status, device='li-ion')
+        # print(f"Li power sent: {control_dict['li_charge']} W, power requested {control_dict['li_discharge']}")
+        li_charge, li_discharge, li_used, li_requested = self._change_storage_charge(power_sent = control_dict['li_charge'], 
+                                                                                        power_requested = control_dict['li_discharge'],
+                                                                                        device='li-ion')
+        li_self_discharge = self.li_battery.self_discharge()
+        # print(f"Li-ion self-discharge = {li_self_discharge}, Li-ion charge = {li_charge}, Li-ion discharge {li_discharge}")
         production_dict['li_ion_charge'].append(li_charge)
-        production_dict['li_ion_discharge'].append(li_discharge+self.ss.storage_suite['li-ion'].self_discharge())
+        production_dict['li_ion_discharge'].append(li_discharge)#+li_self_discharge)
         
         sources += li_requested
         sinks += li_used
 
         # flow battery
-        # if has_battery:
-        flow_charge, flow_discharge, flow_used, flow_requested = self._change_storage_charge(control_dict['flow_charge'],
-                                                                control_dict['flow_discharge'],
-                                                                status, device='flow')
+        flow_charge, flow_discharge, flow_used, flow_requested = self._change_storage_charge(power_sent = control_dict['flow_charge'], 
+                                                                                                power_requested = control_dict['flow_discharge'], 
+                                                                                                device='flow')
+        flow_self_discharge = self.flow_battery.self_discharge()
+        # print(f"Flow self-discharge = {flow_self_discharge}, Flow charge = {flow_charge}, Flow discharge {flow_discharge}")
         production_dict['flow_charge'].append(flow_charge)
-        production_dict['flow_discharge'].append(flow_discharge+self.ss.storage_suite['flow'].self_discharge())
+        production_dict['flow_discharge'].append(flow_discharge)#+flow_self_discharge)
         
         sources += flow_requested # Self discharge is not accounted for in sources
         sinks += flow_used
 
         # flywheel energy storage
-        # if has_battery:
-        flywheel_charge, flywheel_discharge, flywheel_used, flywheel_requested = self._change_storage_charge(control_dict['flywheel_charge'],
-                                                                control_dict['flywheel_discharge'],
-                                                                status, device='flywheel')
+        flywheel_charge, flywheel_discharge, flywheel_used, flywheel_requested = self._change_storage_charge(power_sent = control_dict['flywheel_charge'], 
+                                                                                                                power_requested = control_dict['flywheel_discharge'], 
+                                                                                                                device='flywheel')
+        flywheel_self_discharge = self.flywheel.self_discharge()
+        # print(f"Flywheel self-discharge = {flywheel_self_discharge}, Flywheel charge = {flywheel_charge}, Flywheel discharge {flywheel_discharge}")
         production_dict['flywheel_charge'].append(flywheel_charge)
-        production_dict['flywheel_discharge'].append(flywheel_discharge+self.ss.storage_suite['flywheel'].self_discharge())
+        production_dict['flywheel_discharge'].append(flywheel_discharge)#+flywheel_self_discharge)
         
         sources += flywheel_requested 
         sinks += flywheel_used
@@ -945,10 +927,15 @@ class Microgrid:
             pv_curtailed = pv_available if pv_available > 0 else 0
             overgeneration = -pv_required
 
+        # li_delta = abs(self.li_battery.soc - li_temp)
+        # flow_delta = abs(self.flow_battery.soc - flow_temp)
+        # fly_delta = abs(self.flywheel.soc - fly_temp)
+
         production_dict['pv_consummed'].append(pv_consumed)
         production_dict['loss_load'].append(loss_load)
         production_dict['pv_curtailed'].append(pv_curtailed)
-        production_dict['overgeneration'].append(overgeneration)
+        production_dict['overgeneration'].append(overgeneration/4_000)
+        
 
         return production_dict
 
@@ -1010,51 +997,51 @@ class Microgrid:
     ########################################################
 
 
-    def print_load_pv(self):
+    # def print_load_pv(self):
 
-        print('Load')
-        fig1 = self._load_ts.iplot(asFigure=True)
-        iplot(fig1)
+    #     print('Load')
+    #     fig1 = self._load_ts.iplot(asFigure=True)
+    #     iplot(fig1)
 
-        print('PV')
-        fig2 =self._pv_ts.iplot(asFigure=True)
-        iplot(fig2)
+    #     print('PV')
+    #     fig2 =self._pv_ts.iplot(asFigure=True)
+    #     iplot(fig2)
 
-    def print_actual_production(self):
-        if self._df_record_actual_production != type(pd.DataFrame()):
-            df = pd.DataFrame(self._df_record_actual_production)
-            fig1 = df.iplot(asFigure=True)
-            iplot(fig1)
-        else:
-            fig1 = self._df_record_actual_production.iplot(asFigure=True)
-            iplot(fig1)
+    # def print_actual_production(self):
+    #     if self._df_record_actual_production != type(pd.DataFrame()):
+    #         df = pd.DataFrame(self._df_record_actual_production)
+    #         fig1 = df.iplot(asFigure=True)
+    #         iplot(fig1)
+    #     else:
+    #         fig1 = self._df_record_actual_production.iplot(asFigure=True)
+    #         iplot(fig1)
 
-    def print_control(self):
-        if self._df_record_control_dict != type(pd.DataFrame()):
-            df = pd.DataFrame(self._df_record_control_dict)
-            fig1 = df.iplot(asFigure=True)
-            iplot(fig1)
-        else:
-            fig1 = self._df_record_control_dict.iplot(asFigure=True)
-            iplot(fig1)
+    # def print_control(self):
+    #     if self._df_record_control_dict != type(pd.DataFrame()):
+    #         df = pd.DataFrame(self._df_record_control_dict)
+    #         fig1 = df.iplot(asFigure=True)
+    #         iplot(fig1)
+    #     else:
+    #         fig1 = self._df_record_control_dict.iplot(asFigure=True)
+    #         iplot(fig1)
 
-    def print_co2(self):
-        if self._df_record_co2 != type(pd.DataFrame()):
-            df = pd.DataFrame(self._df_record_co2)
-            fig1 = df.iplot(asFigure=True)
-            iplot(fig1)
-        else:
-            fig1 = self._df_record_co2.iplot(asFigure=True)
-            iplot(fig1)
+    # def print_co2(self):
+    #     if self._df_record_co2 != type(pd.DataFrame()):
+    #         df = pd.DataFrame(self._df_record_co2)
+    #         fig1 = df.iplot(asFigure=True)
+    #         iplot(fig1)
+    #     else:
+    #         fig1 = self._df_record_co2.iplot(asFigure=True)
+    #         iplot(fig1)
 
-    def print_cumsum_cost(self):
-        if self._df_record_cost != type(pd.DataFrame()):
-            df = pd.DataFrame(self._df_record_cost)
-            plt.plot(df.cumsum())
-            plt.show()
-        else:
-            plt.plot(self._df_record_cost.cumsum())
-            plt.show()
+    # def print_cumsum_cost(self):
+    #     if self._df_record_cost != type(pd.DataFrame()):
+    #         df = pd.DataFrame(self._df_record_cost)
+    #         plt.plot(df.cumsum())
+    #         plt.show()
+    #     else:
+    #         plt.plot(self._df_record_cost.cumsum())
+    #         plt.show()
 
 
 
