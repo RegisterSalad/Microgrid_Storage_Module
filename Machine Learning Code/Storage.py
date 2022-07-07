@@ -85,7 +85,7 @@ class StorageSuite:
 
         gc.collect()
 
-    def get_capital_cost(self):
+    def get_capital_cost(self) -> float:
         ''' Returns the total capital cost of all storage devices based on capacity'''
         capital_cost : int = 0
         for device in self.storage_suite:

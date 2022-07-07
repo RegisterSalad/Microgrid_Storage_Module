@@ -1,3 +1,4 @@
+from pickletools import optimize
 from sys import stdout
 from pymgrid import MicrogridGenerator as mg
 import numpy as np
@@ -16,14 +17,15 @@ ZERO = 10**-5 # Low value for zeroes
 
 class GridOptimizer:
     ''' This will create the microgrids, train and test a neural network and optimize the scale of the network'''
-    def __init__(self, data_path: str, constraint: float):
+    def __init__(self, data_path: str, cost_limit: float):
         self.st_data_path = data_path
-        self.constraint = constraint
+        self.cost_limit = cost_limit
         # self.grids = self.create_grids(nb_grid=np.random.randint(1,5))
         self.ss = StorageSuite(filename=self.st_data_path, load = 350_000) # Create baseline storage suite
         self.grid_0_env = mg.MicrogridGenerator(storage_suite_list = [self.ss]) # Base grid that all runs will start with
-        self.current_cost = self.ss.get_capital_cost()
+        self.current_cost: float = self.ss.get_capital_cost()
         self.score_list = []
+        self.constraint = LinearConstraint(self.current_cost, 0, self.cost_limit)
         
     # def create_grids(self, nb_grid: int,):
     #     ''' Grid size will range from 100kW to 600kW'''
@@ -38,19 +40,19 @@ class GridOptimizer:
     def start(self) -> None:
         statement_0 = "\r Starting function optimization"
         stdout.write(statement_0)
-        stdout.flush()     
         self.grid_0_env.generate_microgrid(verbose= False, interpolate= True)
         self.grid = self.grid_0_env.microgrids[0]
         self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack()
-        sleep(3)
         print(f"Grid storage capacities are: Litium Ion Storage : {round(self.li_battery.cap,2)} kWh, Ion Flow Battery: {round(self.flow_battery.cap,2)} kWh, Flywheel Storage: {round(self.flywheel.cap,2)} kWh, load is {round(self.ss.load,2)} kW.")
-        print(f"Grid total cost: ${round(self.current_cost,2)}, constraint is {round(self.constraint,2)}. Delta is {round(self.current_cost-self.constraint,2)}")
-        sleep(3)
-        stdout.flush()
+        print(f"Grid total cost: ${round(self.current_cost,2)}, constraint is {round(self.cost_limit,2)}. Delta is {round(self.current_cost-self.cost_limit,2)}")
         print("Starting score testing\n")
         self.network_path = r"C:\Users\thesu\Desktop\Trained Agent Object.pkl" # Default path for trained network
         self.score_list.append(self.test_network(env = self.grid, horizon=YEAR, load_path = self.network_path)) # Tests the grid using agent at path
-        return None
+        print(f"Testing Complete.\nPerformance Score: {self.score_list[0]}")
+        print("Minimizing.")
+        length_axis = np.zeros((3, 3))
+        optimized_function = minimize(self.current_cost, length_axis, 'trust-constr', constraints=self.constraint)
+        return optimized_function
 
 
 
@@ -77,7 +79,7 @@ class GridOptimizer:
                 agent.store_transition(state, action_select, reward, new_state, done)         
                 agent.learn()                                                           
                 state = new_state                                                       
-                value_print=f"\rEpisode: {episode} Progress " + str(round(((env._tracking_timestep)*100)/(env.horizon),2))
+                value_print=f"\rEpisode: {episode} Progress " + str(round(((env._tracking_timestep)*100)/(env.horizon),1))
                 stdout.write(value_print)
                 stdout.flush()
         env.reset()
@@ -112,7 +114,7 @@ class GridOptimizer:
             new_state,reward, done, = env.run(action)                             
             score+=reward                                                                                                                   
             state = new_state
-            value_print="\rProgress " + str(round(((env._tracking_timestep)*100)/(env.horizon),2)) +" %"
+            value_print="\rProgress " + str(round(((env._tracking_timestep)*100)/(env.horizon),1)) +" %"
             stdout.write(value_print)
             stdout.flush()                                                       
         env.reset()                                                                    
