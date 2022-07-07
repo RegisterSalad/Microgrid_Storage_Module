@@ -51,7 +51,7 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 31579200/900 #in seconds
+DEFAULT_HORIZON = 35_088 #in 15 min intervals
 DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
@@ -59,57 +59,6 @@ ZERO = 10**-5
 The following classes are used to contain the information related to the different components
 of the microgrid. Their main use is for easy access in a notebook.
 '''
-
-# class LiBattery:
-#     ''' Holds data about the Lithium Ion Battery object of the grid. '''
-#     def __init__(self, li_battery_object):
-#         self.soc = li_battery_object['soc']
-#         self.soc_max = li_battery_object['max_soc']
-#         self.soc_min = li_battery_object['min_soc']
-#         self.cap = li_battery_object['capacity']
-#         self.capa_to_charge = self.cap/self.soc
-#         self.capa_to_discharge = self.cap*self.soc
-#         self.eff_charge = li_battery_object['eff_charge']
-#         self.eff_discharge = li_battery_object['eff_discharge']
-#         self.self_discharge = li_battery_object['self_discharge'] # Energy loss per timestep
-#         self.peak_time = li_battery_object['peak_time_left']
-#         self.capital_cost = li_battery_object['capital_cost']
-#         self.max_peak_time = li_battery_object['max_peak_time']
-
-
-# class FlowBattery:
-#     ''' Holds data about the Flow Battery object of the grid. '''
-#     def __init__(self, flow_battery_object):
-#         self.soc = flow_battery_object['soc']
-#         self.soc_max = flow_battery_object['max_soc']
-#         self.soc_min = flow_battery_object['min_soc']
-#         self.cap = flow_battery_object['capacity']
-#         self.capa_to_charge = self.cap/self.soc
-#         self.capa_to_discharge = self.cap*self.soc
-#         self.eff_charge = flow_battery_object['eff_charge']
-#         self.eff_discharge = flow_battery_object['eff_discharge']
-#         self.self_discharge = flow_battery_object['self_discharge'] # Energy loss per timestep
-#         self.peak_time = flow_battery_object['peak_time_left']
-#         self.capital_cost = flow_battery_object['capital_cost']
-#         self.max_peak_time = flow_battery_object['max_peak_time']
-
-
-# class FlywheelBattery:
-#     ''' Holds data about the Flywheel Battery object of the grid. '''
-#     def __init__(self, flywheel_object):
-#         self.soc = flywheel_object['soc']
-#         self.soc_max = flywheel_object['max_soc']
-#         self.soc_min = flywheel_object['min_soc']
-#         self.cap = flywheel_object['capacity']
-#         self.capa_to_charge = self.cap/self.soc
-#         self.capa_to_discharge = self.cap*self.soc
-#         self.eff_charge = flywheel_object['eff_charge']
-#         self.eff_discharge = flywheel_object['eff_discharge']
-#         self.self_discharge = flywheel_object['self_discharge'] # Energy loss per timestep
-#         self.peak_time = flywheel_object['peak_time_left']
-#         self.capital_cost = flywheel_object['capital_cost']
-#         self.max_peak_time = flywheel_object['max_peak_time']
-
 
 class Genset:
     """
