@@ -21,37 +21,44 @@ class GridOptimizer:
         self.st_data_path = data_path
         self.cost_limit = cost_limit
         # self.grids = self.create_grids(nb_grid=np.random.randint(1,5))
+        # self.grid_0_env = mg.MicrogridGenerator(storage_suite_list = [self.ss]) # Base grid that all runs will start with
+        # self.current_cost: float = self.ss.get_capital_cost()
+        # self.score_list = []
         self.ss = StorageSuite(filename=self.st_data_path, load = 350_000) # Create baseline storage suite
-        self.grid_0_env = mg.MicrogridGenerator(storage_suite_list = [self.ss]) # Base grid that all runs will start with
-        self.current_cost: float = self.ss.get_capital_cost()
-        self.score_list = []
-        self.constraint = LinearConstraint(self.current_cost, 0, self.cost_limit)
+        self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack()
+        self.device_cost_list = [self.li_battery.capital_cost, self.flow_battery.capital_cost, self.flywheel.capital_cost]
+        self.constraint = LinearConstraint(self.device_cost_list, 0, self.cost_limit)
+
+    # def start(self) -> None:
+    #     statement_0 = "\r Starting function optimization"
+    #     stdout.write(statement_0)
+    #     self.grid_0_env.generate_microgrid(verbose= False, interpolate= True)
+    #     self.grid = self.grid_0_env.microgrids[0]
         
-    # def create_grids(self, nb_grid: int,):
-    #     ''' Grid size will range from 100kW to 600kW'''
-    #     grid_list = []
-    #     for i in range(nb_grid):
-    #         grid_list.append(StorageSuite(self.st_data_path, load=np.random.randint(1E5,6E5)))
-    #     mg_env = mg.MicrogridGenerator(storage_suite_list=grid_list)
-    #     mg_env.generate_microgrid(verbose= False, interpolate= True)
-    #     return grid_list
-    
-    # Run Microgrid through network
-    def start(self) -> None:
-        statement_0 = "\r Starting function optimization"
-        stdout.write(statement_0)
+    #     print(f"Grid storage capacities are: Litium Ion Storage : {round(self.li_battery.cap,2)} kWh, Ion Flow Battery: {round(self.flow_battery.cap,2)} kWh, Flywheel Storage: {round(self.flywheel.cap,2)} kWh, load is {round(self.ss.load,2)} kW.")
+    #     print(f"Grid total cost: ${round(self.current_cost,2)}, constraint is {round(self.cost_limit,2)}. Delta is {round(self.current_cost-self.cost_limit,2)}")
+    #     # print("Starting score testing\n")
+    #     # self.network_path = r"C:\Users\thesu\Desktop\Trained Agent Object.pkl" # Default path for trained network
+    #     # self.old_score = self.test_network(env = self.grid, horizon=YEAR, load_path = self.network_path)# Tests the grid using agent at path
+    #     # print(f"Testing Complete.\nPerformance Score: {self.score_list[0]}")
+    #     print("Minimizing.")
+    #     length_axis = np.zeros((1,1))
+    #     optimized_function = minimize(self.ss.get_device_capital_costs(), length_axis, 'trust-constr', constraints=self.constraint)
+    #     return optimized_function
+
+    def microgrid_start(self, storage_suite_param):
+        storage_suite_param = self.ss.get_properties()
+        self.ss.modify_ss(storage_suite_param)
+        self.grid_0_env = mg.MicrogridGenerator(storage_suite_list = [self.ss]) # Base grid that all runs will start with
         self.grid_0_env.generate_microgrid(verbose= False, interpolate= True)
         self.grid = self.grid_0_env.microgrids[0]
-        self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack()
-        print(f"Grid storage capacities are: Litium Ion Storage : {round(self.li_battery.cap,2)} kWh, Ion Flow Battery: {round(self.flow_battery.cap,2)} kWh, Flywheel Storage: {round(self.flywheel.cap,2)} kWh, load is {round(self.ss.load,2)} kW.")
-        print(f"Grid total cost: ${round(self.current_cost,2)}, constraint is {round(self.cost_limit,2)}. Delta is {round(self.current_cost-self.cost_limit,2)}")
-        print("Starting score testing\n")
-        self.network_path = r"C:\Users\thesu\Desktop\Trained Agent Object.pkl" # Default path for trained network
-        self.score_list.append(self.test_network(env = self.grid, horizon=YEAR, load_path = self.network_path)) # Tests the grid using agent at path
-        print(f"Testing Complete.\nPerformance Score: {self.score_list[0]}")
-        print("Minimizing.")
-        length_axis = np.zeros((3, 3))
-        optimized_function = minimize(self.current_cost, length_axis, 'trust-constr', constraints=self.constraint)
+        self.grid.train_test_split()
+        return self.ss.get_capital_cost()
+    
+    def start_minimize(self):
+        length_axis = np.zeros((3,))
+        optimized_function = minimize(fun = self.microgrid_start, x0 = length_axis, method='trust-constr', constraints=self.constraint)
+        # print(optimized_function)
         return optimized_function
 
 

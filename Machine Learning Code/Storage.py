@@ -7,6 +7,7 @@ import re
 from unittest.mock import NonCallableMagicMock
 import gc
 import ctypes
+from xmlrpc.client import Boolean
 import numpy as np
 from IPython import display
 ############
@@ -119,6 +120,22 @@ class StorageSuite:
         device.charge(econ_cost, energy_used, energy_stored)
         return energy_used
 
+    def get_device_capital_costs(self, title = False) -> list or dict:
+        if not title:
+            # Returns a list with no keys of all costs
+            cost_list = []
+            properties = self.get_properties()
+            for device in self.storage_suite:
+                cost_list.append(properties[device]['capital_cost'])
+            return cost_list
+        else:
+            # Returns a dict of all costs with storage type names as keys
+            properties = self.get_properties()
+            cost_dict = {"li-ion": 0, "flow": 0, "flywheel": 0}
+            for device in self.storage_suite:
+                cost_dict[device] = properties[device]['capital_cost']
+            return cost_dict
+            
 
     def self_discharge_all(self) -> None:
         ''' self-discharges all devices '''
@@ -137,12 +154,11 @@ class StorageSuite:
 
         return variables
 
-    def get_properties(self):
+    def get_properties(self) -> dict:
         ''' Returns values that stay the same within one microgrid ''' 
         properties = {  'li-ion': {}, 
-                        'flywheel': {},
-                        # 'v2g': {},
-                        'flow': {}
+                        'flow': {},
+                        'flywheel': {}
                         }
         for device in self.storage_suite:
             self.storage_suite[device].get_properties(properties)
@@ -236,7 +252,7 @@ class Storage:
             return eval_expr(self.FORMULA_PEAK_DISCHARGE.replace("self.cap", str(self.cap)).replace("self.power", str(self.power))) # assumed 10s peak capability, in W
         def capital_cost(self): # independent capacity and power capital cost formula
             return eval_expr(self.FORMULA_CAPITAL_COST.replace("x", str(self.cap/1000)).replace("y", str(self.power/1000)).replace("'", ""))
-        self.capital_cost = capital_cost(self)
+        self.capital_cost: float = capital_cost(self)
         self.peak_discharge = peak_discharge(self) # In W
         
         self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kWh in/out, in USD
@@ -298,18 +314,18 @@ class Storage:
             print(prop + ": " + self.DATA[prop] + "\n")
 
     def get_properties(self, properties:dict):
-        properties[self.TYPE]['type'] = self.TYPE
-        properties[self.TYPE]['capacity'] = self.cap
+        properties[self.TYPE]['type']           = self.TYPE
+        properties[self.TYPE]['cap']            = self.cap
         properties[self.TYPE]['max_cont_power'] = self.power
-        properties[self.TYPE]['max_soc'] = self.MAX_SOC
-        properties[self.TYPE]['min_soc'] = self.MIN_SOC
-        properties[self.TYPE]['max_energy'] = self.max_energy
-        properties[self.TYPE]['min_energy'] = self.min_energy
+        properties[self.TYPE]['max_soc']        = self.MAX_SOC
+        properties[self.TYPE]['min_soc']        = self.MIN_SOC
+        properties[self.TYPE]['max_energy']     = self.max_energy
+        properties[self.TYPE]['min_energy']     = self.min_energy
         properties[self.TYPE]['max_peak_power'] = self.peak_discharge
-        properties[self.TYPE]['capital_cost'] = self.capital_cost
-        properties[self.TYPE]['marginal_cost'] = self.MARGINAL_COST
-        properties[self.TYPE]['resp_time'] = self.resp_time
-        properties[self.TYPE]['max_peak_time'] = self.INIT_PEAK_TIME
+        properties[self.TYPE]['capital_cost']   = self.capital_cost
+        properties[self.TYPE]['marginal_cost']  = self.MARGINAL_COST
+        properties[self.TYPE]['resp_time']      = self.resp_time
+        properties[self.TYPE]['max_peak_time']  = self.INIT_PEAK_TIME
 
     def print_variables(self):
         print("**************************\n")

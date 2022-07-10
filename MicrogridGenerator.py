@@ -162,15 +162,7 @@ class MicrogridGenerator:
         # generate a random integer to select the files
         # Resample the file if needed
         return file
-
-    # def horizon_setter(self, interpolate = '15_m'):
-    #     if self.interpolate == '15_m':
-    #         # 15 m logic
-    #         pass
-
-    #     elif self.interpolate == '1_s':
             
-        
     def _scale_ts(self, df_ts, size, scaling_method='sum'):
         """ Scales a time series based on either the sum or the maximum of the time series."""
 
@@ -198,9 +190,6 @@ class MicrogridGenerator:
     ###########################################
     # methods to generate timeseries
     ###########################################
-    # def load_generator(self, shape, annual_consumption=1): #consumption inMWh
-    #     ts_load = np.random(shape)
-    #     annual_consumption = annual_consumption
 
     def _get_pv_ts(self):
         """ Function to get a random PV file."""
@@ -252,21 +241,6 @@ class MicrogridGenerator:
 
         return genset
 
-    # def _get_battery(self, capa=1000, duration=4, pcharge=100, pdischarge=100, soc_max=1, soc_min=ZERO, efficiency=0.9):
-    #     """ Function generates a dictionnary with the battery information. """
-    #     battery={
-    #         'capa':capa,
-    #         'pcharge':int(np.ceil(capa/duration)),
-    #         'pdischarge':int(np.ceil(capa/duration)),
-    #         'soc_max':soc_max,
-    #         'soc_min':soc_min,
-    #         'efficiency':efficiency,
-    #         'soc_0':min(max(np.random.randn(), soc_min),soc_max),
-    #         'cost_cycle':0.02
-
-    #     }
-    #     return battery
-
     def _get_electricity_tariff(self):
         price_import = []
         price_export = []
@@ -297,8 +271,6 @@ class MicrogridGenerator:
 
     def _generate_weak_grid_profile(self,nb_time_step_per_year):
         """ Function generates an outage time series to be used in the microgrids with a weak grid. """
-        #weak_grid_timeseries = np.random.random_integers(0,1, int(nb_time_step_per_year+1) ) #for a number of time steps, value between 0 and 1
-        #generate a timeseries of YEAR/timestep points based on np.random seed
         #profile of ones and zeros
         duration_of_outage = np.random.randint(int(HOUR/6),HOUR*3)
         outage_per_day = (np.random.randn()*3/4 +0.25)*5
@@ -330,10 +302,6 @@ class MicrogridGenerator:
         #PV penetration definition by NREL: https: // www.nrel.gov/docs/fy12osti/55094.pdf
         # penetragion = peak pv / peak load
         pv=load.max().values[0]*(np.random.randint(low=30, high=151)/100)
-        #battery_size = self._size_battery(load)
-        # return a dataframe with the power of each generator, and if applicable the number of generator
-
-        # self.ss = StorageSuite(r'data\energy_storage_devices_v6.csv',load=size_load)
         
         self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack() # These are objects of the Storage class
         
@@ -351,7 +319,7 @@ class MicrogridGenerator:
     def _size_genset(self, load, max_operating_loading = 0.9):
         """ Function that returns the maximum power a genset. """
         #random number > 3 < 20
-        # polynomial for fuel consumption\
+        # polynomial for fuel consumption
         # Is able to match 90% of max load
         _size_genset = int(np.ceil(np.max(load.values)/max_operating_loading))
         return _size_genset
@@ -364,32 +332,12 @@ class MicrogridGenerator:
         """ Function used to generate the nb_microgrids to append them to the microgrids list. It also returns the storage suite object """
         self.interpolate = interpolate
         for i in range(self.nb_microgrids):
-            #size=self._size_mg()
             self.microgrids.append(self._create_microgrid(idx = i))
         
         if verbose == True:
             self.print_mg_parameters()
         
         return self.ss 
-
-    # def _bin_genset_grid(self):
-    #     rand = np.random.rand()
-    #     bin_genset = 0
-    #     bin_grid = 0
-    #     if rand < 0.33:
-    #         bin_genset = 1
-    #     elif rand >= 0.33 and rand < 0.66:
-    #         bin_grid = 1
-    #     else:
-    #         bin_genset = 1
-    #         bin_grid = 1
-    #     return bin_genset, bin_grid
-
-    # def _size_load(self, size_load=None) -> int:
-    #     if size_load is None:
-    #         return np.random.randint(low=1E5,high=6E5)
-    #     else:
-    #         return size_load
 
     def _create_microgrid(self, idx):
         """
@@ -402,8 +350,6 @@ class MicrogridGenerator:
         # create microgrid object and append
         # return the list
         self.ss = self.ss_list[idx]
-        # bin_genset, bin_grid = self._bin_genset_grid()
-
         architecture = {'PV':1, 'battery':1, 'genset':1, 'grid':1}
         size_load = self.ss.load
         load = self._scale_ts(self._get_load_ts(), size_load, scaling_method='max') #obtain dataframe of loads
@@ -416,7 +362,6 @@ class MicrogridGenerator:
         grid_price_import_ts = []
         grid_co2_ts = []
         df_parameters = pd.DataFrame()
-        # df_cost = {'cost':[]}
         df_status = {}
         df_co2 = {'co2':[]}
 
@@ -425,8 +370,7 @@ class MicrogridGenerator:
         df_parameters['cost_loss_load'] = 10
         df_parameters['cost_overgeneration'] = 1
         df_parameters['cost_co2'] = 0.1
-        #df_cost['cost'] = [0.0]
-        df_status['load'] = [np.around(load.iloc[0,0],1)]# --> il y a doublon pour l'instant avec l'architecture PV, -> non si pas de pv la net load est juste la load
+        df_status['load'] = [np.around(load.iloc[0,0],1)]
         df_status['hour'] = [0]
         column_actual_production.append('loss_load')
         column_actual_production.append('overgeneration')
@@ -492,17 +436,13 @@ class MicrogridGenerator:
         grid_spec=0
 
         if architecture['grid']==1:
-
             rand_weak_grid = np.random.randint(low=1, high=2)
-            # price_scenario = np.random.randint(low=1, high=3)
             architecture['genset'] = 1
             grid = self._get_grid(rated_power=size['grid'], weak_grid=rand_weak_grid)
             df_parameters['grid_weak'] = rand_weak_grid
             df_parameters['grid_power_import'] = grid['grid_power_import']
             df_parameters['grid_power_export'] = grid['grid_power_export']
             grid_ts = grid['grid_ts']
-            #df_parameters['grid_price_import'] = grid['grid_price_import']
-            #df_parameters['grid_price_export'] = grid['grid_price_export']
             column_actual_production.append('grid_import')
             column_actual_production.append('grid_export')
             column_actions.append('grid_import')
@@ -510,7 +450,6 @@ class MicrogridGenerator:
             column_cost.append('grid_import')
             column_cost.append('grid_export')
             df_status['grid_variables'] = [grid_ts.iloc[0,0]]
-            #todo Switch back to random file to generate the new version of pymgrid25
             grid_co2_ts = self._get_co2_ts() 
             df_status['grid_co2'] = [grid_co2_ts.iloc[0, 0]]
 
@@ -534,14 +473,10 @@ class MicrogridGenerator:
             column_actual_production.append('genset')
             column_actions.append('genset')
             column_cost.append('genset')
-        # df_status = pd.DataFrame(df_status)
         column_cost.append('total_cost')
-        df_actions= {key:[] for key in column_actions}#pd.DataFrame(columns = column_actions, )
-        # df_actions = pd.DataFrame(df_actions)
-        df_actual_production = {key:[] for key in column_actual_production}#pd.DataFrame(columns=column_actual_production)
-        # df_actual_production = pd.DataFrame(df_actual_production)
+        df_actions= {key:[] for key in column_actions}
+        df_actual_production = {key:[] for key in column_actual_production}
         df_cost = {key: [] for key in column_cost}
-        # df_cost = pd.DataFrame(df_cost)
 
         microgrid_spec={
             'parameters':df_parameters, #Dataframe
@@ -560,13 +495,12 @@ class MicrogridGenerator:
             'grid_price_export' : grid_price_export_ts,
             'grid_co2': grid_co2_ts,
             'storage_suite': self.ss
+            # 'li_cap': f'{self.li_battery.cap} Wh',
+            # 'flow_cap': f'{self.flow_battery.cap} Wh',
+            # 'flywheel_cap': f'{self.flywheel.cap} Wh'
         }
-        display(df_parameters)
+        print(f'New Grid\nli_cap: {self.li_battery.cap} Wh\nflow_cap: {self.flow_battery.cap} Wh\nflywheel_cap: {self.flywheel.cap} Wh')
         microgrid = Microgrid.Microgrid(microgrid_spec = microgrid_spec)
-
-        # for key in df_parameters:
-        #     print(f"Key is: {key}")
-        # return 0
 
         return microgrid
     ########################################################

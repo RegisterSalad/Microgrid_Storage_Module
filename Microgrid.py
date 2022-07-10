@@ -51,7 +51,7 @@ np.random.seed(123)
 
 #cf.set_config_file(offline=True, theme='pearl') #commented for now, issues with parallel processes
 
-DEFAULT_HORIZON = 35_088 #in 15 min intervals
+DEFAULT_HORIZON = 31579200/900 #in seconds
 DEFAULT_TIMESTEP = 1 #in seconds
 ZERO = 10**-5
 
@@ -204,7 +204,7 @@ class Microgrid:
         self._data_set_to_use = 'all'
         self.benchmarks = Benchmarks(self)
         self.ss = microgrid_spec['storage_suite'] # Load Storage class objects
-        self.li_battery, self.flow_battery, self.flywheel = self.ss.unpack() # These are all objects
+        self.li_ion, self.flow_battery, self.flywheel = self.ss.unpack() # These are all objects
         if self.architecture['genset'] == 1:
             self.genset = Genset(self.parameters)
         if self.architecture['grid'] == 1:
@@ -212,6 +212,208 @@ class Microgrid:
                              self._grid_price_import.iloc[0, 0],
                              self._grid_price_export.iloc[0, 0],
                              self._grid_co2.iloc[0, 0])
+
+    def actions_agent(self, action) -> dict:
+        '''Accepts action selection as an integer, Returns control dictionary'''
+        pv =                            self.pv
+        load =                          self.load
+        net_load =                      load-pv
+        status =                        self.grid.status
+
+        li_ion_charge =                 max(0,min(-net_load,self.li_ion.capa_to_charge ,self.li_ion.power))
+        li_ion_discharge =              max(0,min(net_load,self.li_ion.capa_to_discharge,self.li_ion.power))
+
+        flow_charge =                   max(0,min(-net_load,self.flow_battery.capa_to_charge ,self.flow_battery.power))
+        flow_discharge =                max(0,min(net_load,self.flow_battery.capa_to_discharge,self.flow_battery.power))
+
+        flywheel_charge=                max(0,min(-net_load,self.flywheel.capa_to_charge ,self.flywheel.power))
+        flywheel_discharge =            max(0,min(net_load,self.flywheel.capa_to_discharge,self.flywheel.power))
+        
+        li_ion_soc =                    abs(self.li_ion.soc)
+        flow_soc =                      abs(self.flow_battery.soc)
+        flywheel_soc =                  abs(self.flywheel.soc)
+
+        capa_to_genset = self.genset.rated_power * self.genset.p_max
+        p_genset = max(0, min(net_load, capa_to_genset))
+        
+        if action == 0:
+            # CHARGE LI-ION
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': min(net_load,li_ion_charge),
+                                'li_discharge': 0,
+                                'flow_charge': 0,
+                                'flow_discharge': 0,
+                                'flywheel_charge': 0,
+                                'flywheel_discharge': 0,
+                                'grid_import': 0,
+                                'grid_export': abs(net_load)*status,
+                                'genset': 0
+                            }
+        if action == 1:
+            # DISCHARGE LI-ION
+            if li_ion_soc == self.li_ion.MIN_SOC:
+                control_dict = {    'pv_consummed': min(pv,load),
+                                    'li_charge': 0,
+                                    'li_discharge': min(net_load,li_ion_discharge),
+                                    'flow_charge': 0,
+                                    'flow_discharge': 0,
+                                    'flywheel_charge': 0,
+                                    'flywheel_discharge': 0,
+                                    'grid_import': 0,
+                                    'grid_export': abs(net_load)*status,
+                                    'genset': p_genset
+                                }
+            else:
+                control_dict = {    'pv_consummed': min(pv,load),
+                                    'li_charge': 0,
+                                    'li_discharge': min(net_load,li_ion_discharge),
+                                    'flow_charge': 0,
+                                    'flow_discharge': 0,
+                                    'flywheel_charge': 0,
+                                    'flywheel_discharge': 0,
+                                    'grid_import': 0,
+                                    'grid_export': abs(net_load)*status,
+                                    'genset': 0
+                                }
+    ######################
+        if action == 2:
+            # CHARGE FLOW
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': 0,
+                                'li_discharge': 0,
+                                'flow_charge': min(net_load,flow_charge),
+                                'flow_discharge': 0,
+                                'flywheel_charge': 0,
+                                'flywheel_discharge': 0,
+                                'grid_import': 0,
+                                'grid_export': abs(net_load)*status,
+                                'genset': 0
+                            }
+        if action == 3:
+            # DISCHARGE FLOW
+            if flow_soc == self.flow_battery.MIN_SOC:
+                control_dict = {    'pv_consummed': min(pv,load),
+                                    'li_charge': 0,
+                                    'li_discharge': 0,
+                                    'flow_charge': 0,
+                                    'flow_discharge': min(net_load,flow_discharge),
+                                    'flywheel_charge': 0,
+                                    'flywheel_discharge': 0,
+                                    'grid_import': 0,
+                                    'grid_export': abs(net_load)*status,
+                                    'genset': p_genset
+                                }
+            else:
+                control_dict = {    'pv_consummed': min(pv,load),
+                                    'li_charge': 0,
+                                    'li_discharge': 0,
+                                    'flow_charge': 0,
+                                    'flow_discharge': min(net_load,flow_discharge),
+                                    'flywheel_charge': 0,
+                                    'flywheel_discharge': 0,
+                                    'grid_import': 0,
+                                    'grid_export': abs(net_load)*status,
+                                    'genset': 0
+                                }
+    ######################
+        if action == 4:
+            # CHARGE FLYWHEEL
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': 0,
+                                'li_discharge': 0,
+                                'flow_charge': 0,
+                                'flow_discharge': 0,
+                                'flywheel_charge': min(net_load,flywheel_charge),
+                                'flywheel_discharge': 0,
+                                'grid_import': 0,
+                                'grid_export': abs(net_load)*status,
+                                'genset': 0
+                            }
+        if action == 5:
+            # DISCHARGE FLYWHEEL
+            if flywheel_soc == self.flywheel.MIN_SOC:
+                control_dict = {    'pv_consummed': min(pv,load),
+                                    'li_charge': 0,
+                                    'li_discharge': 0,
+                                    'flow_charge': 0,
+                                    'flow_discharge': 0,
+                                    'flywheel_charge': 0,
+                                    'flywheel_discharge': min(net_load,flywheel_discharge),
+                                    'grid_import': 0,
+                                    'grid_export': abs(net_load)*status,
+                                    'genset': p_genset
+                                }
+            else:
+                control_dict = {    'pv_consummed': min(pv,load),
+                                    'li_charge': 0,
+                                    'li_discharge': 0,
+                                    'flow_charge': 0,
+                                    'flow_discharge': 0,
+                                    'flywheel_charge': 0,
+                                    'flywheel_discharge': min(net_load,flywheel_discharge),
+                                    'grid_import': 0,
+                                    'grid_export': abs(net_load)*status,
+                                    'genset': 0
+                                }
+    ######################
+        if action == 6:
+            # IMPORT
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': 0,
+                                'li_discharge': 0,
+                                'flow_charge': 0,
+                                'flow_discharge': 0,
+                                'flywheel_charge': 0,
+                                'flywheel_discharge': 0,
+                                'grid_import': abs(net_load)*status,
+                                'grid_export': 0,
+                                'genset': 0
+                            }
+                            
+        if action == 7:
+            # EXPORT
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': 0,
+                                'li_discharge': 0,
+                                'flow_charge': 0,
+                                'flow_discharge': 0,
+                                'flywheel_charge': 0,
+                                'flywheel_discharge': 0,
+                                'grid_import': 0,
+                                'grid_export': abs(net_load)*status,
+                                'genset': 0
+                            }
+
+    ######################
+        if action == 8:
+            # COMBINED CHARGE IMPORT
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': min(net_load/3,li_ion_charge),
+                                'li_discharge': 0,
+                                'flow_charge': min(net_load/3,flow_charge),
+                                'flow_discharge': 0,
+                                'flywheel_charge': min(net_load/3,flywheel_charge),
+                                'flywheel_discharge': 0,
+                                'grid_import': abs(net_load)*status,
+                                'grid_export': 0,
+                                'genset': 0
+                            }
+                            
+        if action == 9:
+            # COMBINED DISCHARGE EXPORT
+            control_dict = {    'pv_consummed': min(pv,load),
+                                'li_charge': 0,
+                                'li_discharge': min(net_load/3,li_ion_discharge),
+                                'flow_charge': 0,
+                                'flow_discharge': min(net_load/3.,flow_discharge),
+                                'flywheel_charge': 0,
+                                'flywheel_discharge': min(net_load/3,flywheel_discharge),
+                                'grid_import': 0,
+                                'grid_export': abs(net_load)*status,
+                                'genset': 0
+                            }
+            
+        return control_dict
 
     def _param_check(self, parameters):
         """Simple parameter checks"""
@@ -452,7 +654,6 @@ class Microgrid:
             self._df_record_state = self._update_status(control_dict,
                                                         self._df_record_state, self._next_load, self._next_pv)
 
-        # if self._tracking_timestep == self._data_length - self.horizon or self._tracking_timestep == self._data_length - 1:  
         if self._tracking_timestep == self.horizon or self._tracking_timestep == self._data_length - 1:  
             self.done = True
             return list(self.get_updated_values().values()), self.get_cost()/4_000, self.done
@@ -461,8 +662,6 @@ class Microgrid:
         self.update_variables()
 
         return list(self.get_updated_values().values()), self.get_cost()/4_000, self.done
-        # return list(self.get_updated_values().values()), -self.get_cost()/4_000, self.done
-
 
     def train_test_split(self, train_size=0.67, shuffle = False, cancel=False):
         """
@@ -631,7 +830,7 @@ class Microgrid:
                 self._data_length = min(self._load_train.shape[0], self._pv_train.shape[0])
             else:
                 self._data_length = min(self._load_ts.shape[0], self._pv_ts.shape[0])
-        self.li_battery.soc == self.li_battery.MAX_SOC
+        self.li_ion.soc == self.li_ion.MAX_SOC
         self.flow_battery.soc == self.flow_battery.MAX_SOC
         self.flywheel.soc == self.flywheel.MAX_SOC
         self.update_variables()
@@ -671,9 +870,9 @@ class Microgrid:
             'hour':self._tracking_timestep%4,
         }
 
-        new_dict['li_ion_soc'] = self.li_battery.soc
-        new_dict['li_ion_capa_to_charge'] = self.li_battery.capa_to_charge
-        new_dict['li_ion_capa_to_discharge'] = self.li_battery.capa_to_discharge
+        new_dict['li_ion_soc'] = self.li_ion.soc
+        new_dict['li_ion_capa_to_charge'] = self.li_ion.capa_to_charge
+        new_dict['li_ion_capa_to_discharge'] = self.li_ion.capa_to_discharge
         new_dict['flow_soc'] = self.flow_battery.soc
         new_dict['flow_capa_to_charge'] = self.flow_battery.capa_to_charge
         new_dict['flow_capa_to_discharge'] = self.flow_battery.capa_to_discharge
@@ -921,112 +1120,7 @@ class Microgrid:
         cost_dict['total_cost'].append(total_cost)
 
         return cost_dict
-
-    ########################################################
-    # PRINT FUNCTIONS
-    ########################################################
-
-
-    # def print_load_pv(self):
-
-    #     print('Load')
-    #     fig1 = self._load_ts.iplot(asFigure=True)
-    #     iplot(fig1)
-
-    #     print('PV')
-    #     fig2 =self._pv_ts.iplot(asFigure=True)
-    #     iplot(fig2)
-
-    # def print_actual_production(self):
-    #     if self._df_record_actual_production != type(pd.DataFrame()):
-    #         df = pd.DataFrame(self._df_record_actual_production)
-    #         fig1 = df.iplot(asFigure=True)
-    #         iplot(fig1)
-    #     else:
-    #         fig1 = self._df_record_actual_production.iplot(asFigure=True)
-    #         iplot(fig1)
-
-    # def print_control(self):
-    #     if self._df_record_control_dict != type(pd.DataFrame()):
-    #         df = pd.DataFrame(self._df_record_control_dict)
-    #         fig1 = df.iplot(asFigure=True)
-    #         iplot(fig1)
-    #     else:
-    #         fig1 = self._df_record_control_dict.iplot(asFigure=True)
-    #         iplot(fig1)
-
-    # def print_co2(self):
-    #     if self._df_record_co2 != type(pd.DataFrame()):
-    #         df = pd.DataFrame(self._df_record_co2)
-    #         fig1 = df.iplot(asFigure=True)
-    #         iplot(fig1)
-    #     else:
-    #         fig1 = self._df_record_co2.iplot(asFigure=True)
-    #         iplot(fig1)
-
-    # def print_cumsum_cost(self):
-    #     if self._df_record_cost != type(pd.DataFrame()):
-    #         df = pd.DataFrame(self._df_record_cost)
-    #         plt.plot(df.cumsum())
-    #         plt.show()
-    #     else:
-    #         plt.plot(self._df_record_cost.cumsum())
-    #         plt.show()
-
-
-
-    def print_benchmark_cost(self):
-        """
-        This function prints the cumulative cost of the different benchmark ran and different part of the dataset
-        depending on if split it in train/test or not.
-        """
-
-        if len(self.benchmarks.outputs_dict) == 0:
-            print('No benchmark algorithms have been run, running all.')
-            #self.benchmarks.run_benchmarks()
-
-        if self._has_train_test_split:
-            self.benchmarks.describe_benchmarks(test_split=self._has_train_test_split, test_index=self._limit_index)
-
-        else:
-            self.benchmarks.describe_benchmarks(test_split=False)
-
-    def print_info(self):
-        """ This function prints the main information regarding the microgrid."""
-
-        print('Microgrid parameters')
-        display(self.parameters)
-        print('Architecture:')
-        print(self.architecture)
-        print('Actions: ')
-        print(self._df_record_control_dict.keys())
-        print('Control dictionnary:')
-        print(self.control_dict)
-        print('Status: ')
-        print(self._df_record_state.keys())
-        print('Has run mpc baseline:')
-        print(self._has_run_mpc_baseline)
-        print('Has run rule based baseline:')
-        print(self._has_run_rule_based_baseline)
-
-    def print_control_info(self):
-        """ This function prints the control_dict that needs to be used to control the microgrid"""
-
-        print('you should fill this dictionnary at each time step')
-        print('it is included in the mg_data object')
-        print('you can copy it by: ctrl = mg_data.control_dict')
-        print('or you can use self.get_conrol_dict()')
-        print('Control dictionnary:')
-        print(self.control_dict)
-
-    def print_updated_parameters(self):
-        """ This function prints the last values for the parameters of the microgrid changing with time."""
-        state={}
-        for i in self._df_record_state:
-            state[i] = self._df_record_state[i][-1]
-
-        print(state)
-
+        
     ########################################################
     # RL UTILITY FUNCTIONS
     ########################################################
