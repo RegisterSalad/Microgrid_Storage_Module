@@ -942,11 +942,10 @@ class Microgrid:
             raise ValueError("Cannot charge and discharge in the same timestep. Check your actions for conflicts")
 
         if power_sent > 0:
-            power_sent, power_stored = self.ss.storage_suite[device].charge(power_used = power_sent)
-
+            power_sent, power_stored = self.ss.charge(stor_type = device ,power_used = power_sent)
             power_pulled, power_requested = (0,0)
         if power_requested > 0:
-            power_requested, power_pulled = self.ss.storage_suite[device].discharge(power_requested = power_requested)
+            power_requested, power_pulled = self.ss.discharge(stor_type = device, power_requested = power_requested)
             power_stored, power_sent = (0,0)
         if (power_requested, power_sent) == (0,0):
             return 0,0,0,0
