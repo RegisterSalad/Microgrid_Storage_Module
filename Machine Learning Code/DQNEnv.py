@@ -12,7 +12,7 @@ import numpy as np
 from pyrsistent import b
 import torch
 from torch.optim import Adam
-from torch.nn import Linear, ReLU, Sequential, MSELoss
+from torch.nn import Linear, ReLU, Sequential, MSELoss, Sigmoid
 
 class ReplayBuffer(object):
     def __init__(self, state_len, mem_size):
@@ -24,7 +24,6 @@ class ReplayBuffer(object):
         self.rewards = np.zeros(mem_size, dtype=np.float32)
         self.new_states = np.zeros((mem_size, state_len), dtype=np.float32)
         self.dones = np.zeros(mem_size, dtype=np.int32)
-
 
     def store_transition(self, state, action, reward, new_state, done):
         index = self.mem_counter%self.mem_size
@@ -45,29 +44,28 @@ class ReplayBuffer(object):
         dones = self.dones[batch]
         return states, actions, rewards, new_states, dones
 
-
 class DQNetwork(torch.nn.Module):
     def __init__(self, state_len, n_actions,learning_rate):
         super(DQNetwork, self).__init__()
         self.device = torch.device('cuda:0')
-        print(torch.cuda.is_available())
         self.learning_rate = learning_rate
         self.n_actions = n_actions
         self.network = Sequential(
-            Linear(state_len,16),
-            ReLU(),
-            Linear(16, 16),
-            ReLU(),
-            Linear(15, 15),
-            ReLU(),
-            Linear(14, 14),
-            ReLU(),
-            Linear(13, n_actions)
+            Linear(state_len,29),
+            Sigmoid(),
+            Linear(29, 26),
+            Sigmoid(),
+            Linear(26, 23),
+            Sigmoid(),
+            Linear(23, 20),
+            Sigmoid(),
+            Linear(20, 17),
+            Sigmoid(),
+            Linear(17, n_actions)
         )
         self.optimizer = Adam(self.parameters(), lr = learning_rate)
         self.loss = MSELoss(reduction='sum')
         self.to(self.device)
-
 
     def forward(self,state):
         return self.network(state)
@@ -84,7 +82,7 @@ class DQAgent(object):
         self.epsilon_dec = epsilon_dec # the factor by which epsilon will be multiplied by at each timestep
         self.mem_size = mem_size       # the number of timesteps, memory will be allocated for. After that old memory will be overwritten
         #how many timestep the agent must have stored before it learns (to reduce overfitting)
-        self.min_memory_for_training = min_memory_for_training 
+        self.min_memory_for_training = min_memory_for_training
         ##############
         self.q = DQNetwork(state_len, n_actions, learning_rate)      # the neural network
         self.replay_buffer = ReplayBuffer(self.state_len, mem_size)  # the replay buffer for experience replay
@@ -97,7 +95,7 @@ class DQAgent(object):
             action = np.random.choice(np.arange(self.n_actions))
         else:
             state = torch.tensor([state], dtype = torch.float32).to(self.q.device)        #make state a tensor and add batch dimension
-            q= self.q.forward(state)                                                      #forward pass
+            q = self.q.forward(state)                                                      #forward pass
             action = torch.argmax(q)                                                      #selection action with highest q value
         return int(action)
 
@@ -112,7 +110,7 @@ class DQAgent(object):
         rewards_batch = torch.tensor(rewards, dtype = torch.float32).to(self.q.device)
         dones_batch = torch.tensor(dones, dtype = torch.float32).to(self.q.device)
 
-        target = rewards_batch + torch.mul(self.gamma* self.q(new_states_batch).max(axis = 1).values, (1 - dones_batch))  #target value
+        target = rewards_batch + torch.mul(self.gamma * self.q(new_states_batch).max(axis = 1).values, (1 - dones_batch))  #target value
         prediction = self.q.forward(states_batch).gather(1,actions_batch.unsqueeze(1)).squeeze(1)                         #predicted value
 
         loss = self.q.loss(prediction, target)

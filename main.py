@@ -22,6 +22,7 @@ def microgrid_start(storage_suite_param):
     return m_gen.microgrids[0].econ_cost
 
 x0 = np.zeros((len(dcc), len(dcc)))
+
 res = minimize(microgrid_start, x0=x0, method='trust-constr', constraints=linear_constraint)
 
 """

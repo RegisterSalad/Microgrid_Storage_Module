@@ -499,7 +499,7 @@ class MicrogridGenerator:
             # 'flow_cap': f'{self.flow_battery.cap} Wh',
             # 'flywheel_cap': f'{self.flywheel.cap} Wh'
         }
-        print(f'New Grid\nli_cap: {self.li_battery.cap} Wh\nflow_cap: {self.flow_battery.cap} Wh\nflywheel_cap: {self.flywheel.cap} Wh')
+        # print(f'New Grid\nli_cap: {self.li_battery.cap} Wh\nflow_cap: {self.flow_battery.cap} Wh\nflywheel_cap: {self.flywheel.cap} Wh')
         microgrid = Microgrid.Microgrid(microgrid_spec = microgrid_spec)
 
         return microgrid

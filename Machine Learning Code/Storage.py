@@ -1,28 +1,21 @@
 import csv
 import ast
-from logging import captureWarnings #Library for parsing formula syntax
 import operator as op
 from math import e
-import re
-from unittest.mock import NonCallableMagicMock
 import gc
-import ctypes
-from xmlrpc.client import Boolean
-import numpy as np
-from IPython import display
 ############
 ''' the following is a string -> evaluation parser '''
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
              ast.USub: op.neg}
 
-def eval_expr(expr):
+def eval_expr(expr) -> float :
     if expr != '':
         return eval_(ast.parse(expr, mode='eval').body)
     else:
         return None
 
-def eval_(node):
+def eval_(node) -> float:
     if isinstance(node, ast.Num): # <number>
         return node.n
     elif isinstance(node, ast.BinOp): # <left> <operator> <right>
@@ -31,17 +24,31 @@ def eval_(node):
         return operators[type(node.op)](eval_(node.operand))
     else:
         raise TypeError(node)
-
 ############
 
 
 class StorageSuite:
     ''' StorageSuite aggregates all Storage objects so that they can be interacted in a straightforward manner
-        Each microgrid contains 3 storage objects:
-            - Litium Ion Storage (includes vehicle to grid)
+
+        Parameters
+        ----------
+            - filename: str, name of storage device behavior data file
+            - load: int, measure of max power used by grid in W (J/s)
+
+        Attributes
+        ----------
+            - self.device_data: dict, parsed data from input file
+            - self.storage_suite: dict, Dictionnary containing all Storage class objects
+            - self.load: int, measure of max power used by grid in W (J/s)
+        
+        Description
+        -----------
+            Each microgrid contains 3 storage objects:
+            - Litium Ion Storage
             - Vanadium Flow Storage
             - Flywheel Energy Storage
-        Each storage object contains the values:
+            
+            Each storage object contains the values:
             - type
             - cap
             - max_cont_power
@@ -55,34 +62,31 @@ class StorageSuite:
             - resp_time
             - max_peak_time 
     '''
-    def __init__(self, filename,load):
+    def __init__(self, filename,load) -> None:
         self.device_data = {} # the string data from the CSV file
         self.storage_suite = {} # where the Storage objects are stored (str(name) -> Storage)
-        self.tracking_timestep = 0
         self.load = load
         with open(filename, newline='', encoding='utf-8-sig') as devices_file: # opens storage data file
             reader = csv.DictReader(devices_file)
             for row in reader:
                 self.device_data[row['type']] = row
         baseline_capacity_dict ={  'li-ion': load/3,
-                                    'flywheel': load/3,
-                                    # 'v2g': round(0.25*load,2),
-                                    'flow': load/3
+                                    'flow': load/3,
+                                    'flywheel': load/3
                                 }
         for device in self.device_data:
             self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap = float(baseline_capacity_dict[device]))
         
 
-    def modify_ss(self, param: dict): # 
+    def modify_ss(self, param: list) -> None: # 
         ''' Takes in a dict containing new power and capacity values, re-initializes all Storage objects '''
         #print(gc.isenabled())
-        for device in param:
-            #self.storage_suite[device].modify(param[device])
+        for idx, device in enumerate(self.storage_suite):
             del self.storage_suite[device]
             try:
-                self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap=param[device]['cap'], power=param[device]['power'])
+                self.storage_suite[device] = Storage(data = self.device_data[device], type = device, cap = param[idx])#, power=param[device]['power'])
             except KeyError:
-                self.storage_suite[device] = Storage(data=self.device_data[device], type=device, cap=param[device]['cap'])
+                self.storage_suite[device] = Storage(data = self.device_data[device], type = device, cap = param[idx])
 
         gc.collect()
 
@@ -108,13 +112,13 @@ class StorageSuite:
         for device in self.storage_suite:
             self.storage_suite[device].print_properties()
 
-    def discharge(self, stor_type, econ_cost = None, energy_requested=None, energy_spent=None):
+    def discharge(self, stor_type, econ_cost = None, energy_requested=None, energy_spent=None) -> float:
         ''' attempts to discharge a given device based on the usable amount wanted or the amount to remove from the device '''
         device = self.storage_suite[stor_type]
         device.discharge(econ_cost, energy_requested, energy_spent)
         return energy_requested
 
-    def charge(self, stor_type, econ_cost=None, energy_used=None, energy_stored=None):
+    def charge(self, stor_type, econ_cost=None, energy_used=None, energy_stored=None) -> float:
         ''' attempts to charge a given device based on the usable amount wanted or the amount to supply to the device '''
         device = self.storage_suite[stor_type]
         device.charge(econ_cost, energy_used, energy_stored)
@@ -135,6 +139,13 @@ class StorageSuite:
             for device in self.storage_suite:
                 cost_dict[device] = properties[device]['capital_cost']
             return cost_dict
+
+    def get_device_capacities(self) -> list:
+        cap_list = []
+        properties = self.get_properties()
+        for device in self.storage_suite:
+            cap_list.append(properties[device]['cap'])
+        return cap_list
             
 
     def self_discharge_all(self) -> None:
@@ -171,7 +182,14 @@ class StorageSuite:
             cost = cost + properties[device]['capital_cost']
         return cost
 
-    def unpack(self):
+    def get_total_capital_cost_formula(self) -> str:
+        li_ion, flow, flywheel = self.unpack()
+        li_formula = li_ion.FORMULA_CAPITAL_COST.replace("x", "L").replace("y", str(li_ion.FORMULA_POWER.replace("self.cap", "L"))).replace("'", "")
+        flow_formula = flow.FORMULA_CAPITAL_COST.replace("x", "F").replace("y", str(flow.FORMULA_POWER.replace("self.cap", "F"))).replace("'", "")
+        flywheel_formula = flywheel.FORMULA_CAPITAL_COST.replace("x", "W").replace("y", str(flywheel.FORMULA_POWER.replace("self.cap", "W"))).replace("'", "") 
+        return li_formula + "+" + flow_formula + "+" + flywheel_formula
+
+    def unpack(self) -> object:
         """ Returns the objects of the different storage types. """
         mg_stats = self.get_properties()
         mg_variables = self.get_status_variables()
@@ -184,67 +202,57 @@ class StorageSuite:
         flywheel = self.storage_suite['flywheel']
 
         return li_battery, flow_battery, flywheel
-        
-
-
-
-
-
-
-
-
-
-# StorageSuite
-# Inputs:
-#   param: a dict(device->dict(parameter->value)) where
-#       - the parent dict's keys are each device (str) in data, the value of each is a
-#       - dict of parameter (i.e. cap, or power if applicable) to its value
-
-# Wondering if a StorageSuite class is needed or if this can just be implemented within the code.
-# I'll have to think about this.
-# To avoid excessive RAM usage, might reuse Storage classes between microgrids and just overwrite them
-# - could just write their data/parameters to a text file before moving on to the next microgrid
-
-#string.replace(old, new) (immutable) [replace() syntax]
-
-# need to account for some types 
-
-# v2g is going to have to have unit capacity multiplied by number of houses
-# probably similar to how PV generation is determined
-
-
 
 class Storage:
-    def __init__(self, data: dict, type: str, cap=1, power=0): # 100 and 10 placeholder for testing
+    '''
+    StorageSuite
+        Parameters
+        ----------
+            - data: dict, parsed storage device behavior data; is different for each type
+            - type: str, desired storage device type
+            - cap: float, desired storage device capacity in Wh
+        
+        Attributes
+        ----------
+            - self.DATA: constant dict, container for storage device behavior data
+            - self.TYPE: constant str, container for storage device type
+            - self.cap: float, containter for storage device capacity in Wh
+            - self.power: float, containter for storage device max  continuous power
+            - self.MAX_SOC: constant float, container for maximum state of charge as a proportion of capacity
+            - self.MIN_SOC: constant float, container for minimum state of charge as a proportion of capacity
+            - self.min_energy: float = container for minimum energy in device
+            - self.FORMULA_PEAK_DISCHARGE: constant str, containter for max peak discharge formula
+            - self.FORMULA_EFF_CHARGE: constant str, containter for charge efficiency formula
+            - self.FORMULA_EFF_DISCHARGE: constant str, containter for discharge efficiency formula
+            - self.FORMULA_SELF_DISCHARGE: constant str, containter for self-dsicharge formula
+            - self.FORMULA_CAPITAL COST: constant str, containter for device capital cost formula based on desired capacity
+
+    '''
+    def __init__(self, data: dict, type: str, cap=1) -> None: # 100 and 10 placeholder for testing
         
         #fixed
         self.DATA = data # CSV data dictionary
         self.TYPE = type # string representing the type of device
         self.cap = cap # capacity, in Wh
-        self.power = power # power
-        if self.power == 0:
-            self.power = eval_expr(str(data['max_cont_discharge'].replace("x", str(self.cap)))) # Returns in W
+        self.power = eval_expr(str(data['max_cont_discharge'].replace("x", str(self.cap)))) # Returns in W
+        self.FORMULA_POWER = str(data['max_cont_discharge'].replace("x", "self.cap"))
         """
         self.START_WINDOW = data['start_window'] # start time that device can be used (V2G), in seconds of the day out of 86,400
         self.END_WINDOW = data['end'] # end time that device can be used (V2G), in seconds of the day out of 86,400
         """
         self.MAX_SOC = float(data['max_charge']) # maximum charge as a proportion of capacity
         self.MIN_SOC = float(data['min_charge']) # minimum charge as a proportion of capacity
-        self.max_energy = self.cap  # * data['max_charge']  #maximum charge in kWh
+        self.cap  # * data['max_charge']  #maximum charge in kWh
         self.min_energy = self.MIN_SOC * self.cap        # * data['min_charge']  #minimum charge in kWh
-        #self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate'] * 
+        #self.MAX_CHARGE_RATE = ss.device_data['max_charge_rate']
         #self.MIN_CHARGE_RATE = ss.device_data['min_charge_rate']
-        #self.MAX_CONT_DISCHARGE = ss.device_data['max_cont_discharge'] 
-        
+        #self.MAX_CONT_DISCHARGE = ss.device_data['max_cont_discharge']
         #self.MIN_DISCHARGE = ss.device_data['min_discharge'] * cap
 
      
         #calculated
         self.FORMULA_PEAK_DISCHARGE = data['max_peak_discharge'].replace("x", "self.cap").replace("y", "self.power") # in W
         self.FORMULA_EFF_CHARGE = data['eff_charge'].replace("x", "self.soc")
-        
-        # may need to adjust formulae in current CSV to take proportional SOC rather than current_charge
-        # would just have to divide each x in the formula by the capacity of the flywheel used for modelling, probably 29kWh
         self.FORMULA_EFF_DISCHARGE = data['eff_discharge'].replace("x", "self.soc").replace("'", "")
         self.FORMULA_SELF_DISCHARGE = data['self_discharge'].replace("x", "self.soc").replace("'", "") # where x is SoC
         self.FORMULA_CAPITAL_COST = data['capital_cost']
@@ -256,7 +264,6 @@ class Storage:
         self.peak_discharge = peak_discharge(self) # In W
         
         self.MARGINAL_COST = data['marginal_cost'] # cost to use device per kWh in/out, in USD
-        # self.ramp_speed = ss.device_data['ramp_speed']
         self.resp_time = data['resp_time'] # time it takes for device to realize command, in seconds
         self.soc = 1 # state of charge as a proportion of capacity
         self.soc_cap = self.soc * self.cap # state of charge in kWh
@@ -264,26 +271,25 @@ class Storage:
         self.peak_time = int(self.INIT_PEAK_TIME) #how many consecutive seconds the device can still peak for
         self.capa_to_charge = self.cap * (1-self.soc)
         self.capa_to_discharge = self.cap * self.soc
-        #user/AI-defined
         pass
 
-    def get_self_discharge_rate(self): # self-discharge rate, in SOC/s
-        self.soc_cap = self.max_energy * self.soc
+    def get_self_discharge_rate(self) -> float: # self-discharge rate, in SOC/s
+        self.soc_cap = self.cap * self.soc
         return eval_expr(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
         # parsed_expr = ast.parse(self.FORMULA_SELF_DISCHARGE.replace("self.soc", str(self.soc)).replace("e", str(e)))
         # return ast.literal_eval(parsed_expr)
-    def eff_charge(self): # charge effiency function
-        self.soc_cap = self.max_energy * self.soc
+    def eff_charge(self) -> float: # charge effiency function
+        self.soc_cap = self.cap * self.soc
         return eval_expr(self.FORMULA_EFF_CHARGE.replace("self.soc", str(self.soc)).replace("'", ""))
 
-    def eff_discharge(self): # discharge effiency function
-        self.soc_cap = self.max_energy * self.soc
+    def eff_discharge(self) -> float: # discharge effiency function
+        self.soc_cap = self.cap * self.soc
         return eval_expr(self.FORMULA_EFF_DISCHARGE.replace("self.soc", str(self.soc)))
 
-    def current_charge(self):
+    def current_charge(self) -> float:
         return self.soc * self.cap
     
-    def self_discharge(self):
+    def self_discharge(self) -> float:
         delta_soc = self.get_self_discharge_rate()/1000 # In %
         if (self.soc - delta_soc) < self.MIN_SOC:
             self.soc = self.MIN_SOC
@@ -291,35 +297,35 @@ class Storage:
             self.soc_cap = self.min_energy
         else:
             self.soc -= delta_soc
-            self.soc_cap = self.max_energy * self.soc
+            self.soc_cap = self.cap * self.soc
 
         return (delta_soc * self.cap) # Energy Lost in Wh
-    """
-    def modify(self, param: dict):
-        self.cap = param['cap']
-        if 'power' in param:
-            self.power = param['power']
-        else:
-            self.power = self.cap * eval_expr(self.DATA['max_cont_discharge'].replace("x", str(self.cap)))
-        self.peak_discharge = eval_expr(self.DATA['max_peak_discharge'].replace("x", str(self.power))) * self.power
-        self.max_energy = self.DATA['max_charge'] * self.cap
-        self.min_energy = self.DATA['min_charge'] * self.cap
-        self.capital_cost = capital_cost()
-    """
 
-    def print_properties(self):
+    # def modify(self, param: dict):
+    #     self.cap = param['cap']
+    #     if 'power' in param:
+    #         self.power = param['power']
+    #     else:
+    #         self.power = self.cap * eval_expr(self.DATA['max_cont_discharge'].replace("x", str(self.cap)))
+    #     self.peak_discharge = eval_expr(self.DATA['max_peak_discharge'].replace("x", str(self.power))) * self.power
+    #     self.cap = self.DATA['max_charge'] * self.cap
+    #     self.min_energy = self.DATA['min_charge'] * self.cap
+    #     self.capital_cost = capital_cost()
+
+
+    def print_properties(self) -> None:
         print("**************************\n")
         print("Device: " + self.TYPE)
         for prop in self.DATA:
             print(prop + ": " + self.DATA[prop] + "\n")
 
-    def get_properties(self, properties:dict):
+    def get_properties(self, properties:dict) -> None:
         properties[self.TYPE]['type']           = self.TYPE
         properties[self.TYPE]['cap']            = self.cap
         properties[self.TYPE]['max_cont_power'] = self.power
         properties[self.TYPE]['max_soc']        = self.MAX_SOC
         properties[self.TYPE]['min_soc']        = self.MIN_SOC
-        properties[self.TYPE]['max_energy']     = self.max_energy
+        properties[self.TYPE]['max_energy']     = self.cap
         properties[self.TYPE]['min_energy']     = self.min_energy
         properties[self.TYPE]['max_peak_power'] = self.peak_discharge
         properties[self.TYPE]['capital_cost']   = self.capital_cost
@@ -327,13 +333,13 @@ class Storage:
         properties[self.TYPE]['resp_time']      = self.resp_time
         properties[self.TYPE]['max_peak_time']  = self.INIT_PEAK_TIME
 
-    def print_variables(self):
+    def print_variables(self) -> None:
         print("**************************\n")
         print("Device: " + self.TYPE + "\n")
         print("Capacity: " + self.cap + "kWh\n")
         print("Power: " + self.power + "kW\n")
 
-    def get_state(self, variables:dict):
+    def get_state(self, variables:dict) -> None:
         variables[self.TYPE]['soc'] = self.soc
         variables[self.TYPE]['stored_energy'] = self.current_charge()
         variables[self.TYPE]['eff_charge'] = self.eff_charge()
