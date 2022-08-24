@@ -136,7 +136,7 @@ class GridOptimizer:
                         n_actions = nb_actions,
                         mem_size = 1000000,
                         min_memory_for_training=1000, epsilon=1, epsilon_dec=0.99,
-                        epsilon_min = 0.02)
+                        epsilon_min = 0.02, training = True )
         #main training loop
         for episode in range(n_episodes):
             state = env.reset()                              

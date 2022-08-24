@@ -13,6 +13,8 @@ from pyrsistent import b
 import torch
 from torch.optim import Adam
 from torch.nn import Linear, ReLU, Sequential, MSELoss, Sigmoid
+from pathlib import Path
+import pickle as pkl
 
 class ReplayBuffer(object):
     def __init__(self, state_len, mem_size):
@@ -72,7 +74,7 @@ class DQNetwork(torch.nn.Module):
 
 
 class DQAgent(object):
-    def __init__(self, learning_rate, gamma, batch_size, state_len, n_actions, min_memory_for_training,epsilon, epsilon_min, epsilon_dec,mem_size ):
+    def __init__(self, learning_rate, gamma, batch_size, state_len, n_actions, min_memory_for_training,epsilon, epsilon_min, epsilon_dec,mem_size, training: bool = False):
         self.gamma = gamma             # gamma hyperparameter
         self.batch_size = batch_size   # batch size hyperparameter for neural network
         self.state_len = state_len     # how long the state vector is
@@ -86,7 +88,8 @@ class DQAgent(object):
         ##############
         self.q = DQNetwork(state_len, n_actions, learning_rate)      # the neural network
         self.replay_buffer = ReplayBuffer(self.state_len, mem_size)  # the replay buffer for experience replay
-        
+        self.training = training
+
     def store_transition(self, state, action, reward, new_state, done):             # stores a timestep in memory
         self.replay_buffer.store_transition(state, action, reward, new_state, done)
 
@@ -121,3 +124,14 @@ class DQAgent(object):
         self.epsilon = self.epsilon * self.epsilon_dec if self.epsilon *self.epsilon_dec \
                                                           > self.epsilon_min else self.epsilon_min
         return
+
+    def __del__(self):
+        # Stores the agent as a .pkl file
+        if self.training == True:
+            store_path = str(Path(__file__).parent)+'/Agent.pkl'
+            with open(store_path, 'wb') as f:  
+                pkl.dump(obj=self, file=f)
+            print(f"Agent Trained and Stored at {store_path}")
+        
+        else:
+            print('Agent instance deleted.')
